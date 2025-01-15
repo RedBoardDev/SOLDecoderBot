@@ -1,17 +1,22 @@
-import { Client, GatewayIntentBits, TextChannel } from 'discord.js';
+import { Client, GatewayIntentBits, TextChannel, Message } from 'discord.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const BOT_TOKEN = process.env.DISCORD_TOKEN;
-const CHANNEL_ID = process.env.CHANNEL_ID;
+const BOT_TOKEN: string | undefined = process.env.DISCORD_TOKEN;
+const CHANNEL_IDS: string[] = ['1324839823655309394', '1318306500006903909'];
+const MATCH_PREFIXES: string[] = ['Starting SOL balance', '🛑Stop loss', '🎯Take profit'];
 
-if (!BOT_TOKEN || !CHANNEL_ID) {
-  console.error('Missing DISCORD_TOKEN or CHANNEL_ID in .env file.');
+if (!BOT_TOKEN || CHANNEL_IDS.length === 0) {
+  console.error('Missing DISCORD_TOKEN or CHANNEL_IDS in code.');
   process.exit(1);
 }
 
-const pinMessagesOldToNew = async (channel: TextChannel, matchText: string): Promise<void> => {
+const shouldPinMessage = (content: string): boolean => {
+  return MATCH_PREFIXES.some((prefix) => content.startsWith(prefix));
+};
+
+const pinMessagesOldToNew = async (channel: TextChannel): Promise<void> => {
   try {
     let lastMessageId: string | undefined;
     const messagesToPin: string[] = [];
@@ -24,11 +29,8 @@ const pinMessagesOldToNew = async (channel: TextChannel, matchText: string): Pro
 
       if (messages.size === 0) break;
 
-      messages.forEach((message) => {
-        if (
-          message.content.startsWith(matchText) &&
-          !message.pinned
-        ) {
+      messages.forEach((message: Message) => {
+        if (shouldPinMessage(message.content) && !message.pinned) {
           messagesToPin.push(message.id);
         }
       });
@@ -47,26 +49,32 @@ const pinMessagesOldToNew = async (channel: TextChannel, matchText: string): Pro
 };
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user?.tag}`);
 
-  const channel = client.channels.cache.get(CHANNEL_ID) as TextChannel;
+  for (const channelId of CHANNEL_IDS) {
+    const channel = client.channels.cache.get(channelId) as TextChannel;
 
-  if (channel) {
-    await pinMessagesOldToNew(channel, 'Opened a new pool ');
-    console.log('Finished pinning messages.');
-  } else {
-    console.error('Channel not found.');
+    if (channel) {
+      await pinMessagesOldToNew(channel);
+      console.log(`Finished pinning messages in channel: ${channel.name}`);
+    } else {
+      console.error(`Channel not found: ${channelId}`);
+    }
   }
 });
 
-client.on('messageCreate', async (message) => {
+client.on('messageCreate', async (message: Message) => {
   if (
-    message.channel.id === CHANNEL_ID &&
-    message.content.startsWith('Opened a new pool ') &&
+    CHANNEL_IDS.includes(message.channel.id) &&
+    shouldPinMessage(message.content) &&
     !message.pinned
   ) {
     try {
