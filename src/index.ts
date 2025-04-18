@@ -1,6 +1,7 @@
 import { add } from '@commands/add';
 import { list } from '@commands/list';
 import { load } from '@commands/load';
+import { unload } from '@commands/unload';
 import { remove } from '@commands/remove';
 import { messageCreate } from '@events/message-create';
 import type { Command } from '@type/command';
@@ -20,7 +21,7 @@ declare module 'discord.js' {
 }
 
 client.commands = new Collection<string, Command>();
-const commands = [add, remove, load, list];
+const commands = [add, remove, load, unload, list];
 for (const command of commands) {
   client.commands.set(command.data.name, command);
 }

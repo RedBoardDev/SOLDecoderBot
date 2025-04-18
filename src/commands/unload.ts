@@ -5,8 +5,10 @@ import { type CommandInteraction, SlashCommandBuilder, PermissionsBitField } fro
 const service = new ChannelService();
 const MAX_MESSAGES = 10000;
 
-export const load: Command = {
-  data: new SlashCommandBuilder().setName('load').setDescription("Charge et traite jusqu'à 10 000 messages existants"),
+export const unload: Command = {
+  data: new SlashCommandBuilder()
+    .setName('unload')
+    .setDescription("Désépingle jusqu'à 10 000 messages dans les salons surveillés"),
   async execute(interaction: CommandInteraction): Promise<void> {
     const guildId = interaction.guildId;
     if (!guildId) {
@@ -20,12 +22,16 @@ export const load: Command = {
       return;
     }
 
-    if (!service.checkBotPermissions(botMember, undefined, PermissionsBitField.Flags.ViewChannel)) {
-      await interaction.reply("Le bot n'a pas la permission de voir les salons.");
+    if (!service.checkBotPermissions(botMember, undefined, PermissionsBitField.Flags.ManageMessages)) {
+      await interaction.reply("Le bot n'a pas la permission de gérer les messages.");
       return;
     }
 
-    const monitoredChannels = await service.fetchMonitoredChannels(guildId, botMember);
+    const monitoredChannels = await service.fetchMonitoredChannels(
+      guildId,
+      botMember,
+      PermissionsBitField.Flags.ManageMessages,
+    );
     if (monitoredChannels.length === 0) {
       await interaction.reply('Aucun salon surveillé avec les permissions nécessaires.');
       return;
@@ -34,12 +40,12 @@ export const load: Command = {
     await interaction.deferReply({ ephemeral: true });
     try {
       for (const channel of monitoredChannels) {
-        await service.processExistingMessages(channel, MAX_MESSAGES);
+        await service.unpinExistingMessages(channel, MAX_MESSAGES);
       }
-      await interaction.editReply('Traitement terminé.');
+      await interaction.editReply('Désépinglage terminé.');
     } catch (error) {
-      console.error('Erreur lors du traitement des messages:', error);
-      await interaction.editReply('Erreur lors du traitement.');
+      console.error('Erreur lors du désépinglage des messages:', error);
+      await interaction.editReply('Erreur lors du désépinglage.');
     }
   },
 };

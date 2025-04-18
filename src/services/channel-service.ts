@@ -1,5 +1,12 @@
 import { ChannelRepository } from '@repositories/channel-repository';
-import { EmbedBuilder, TextChannel, type Message, type TextBasedChannel } from 'discord.js';
+import {
+  EmbedBuilder,
+  type GuildMember,
+  PermissionsBitField,
+  TextChannel,
+  type Message,
+  type TextBasedChannel,
+} from 'discord.js';
 
 export class ChannelService {
   private readonly repository: ChannelRepository;
@@ -18,6 +25,36 @@ export class ChannelService {
 
   public getMonitoredChannels(guildId: string): string[] {
     return this.repository.getMonitoredChannels(guildId);
+  }
+
+  public async fetchMonitoredChannels(
+    guildId: string,
+    botMember: GuildMember,
+    requiredPermissions: bigint = PermissionsBitField.Flags.ViewChannel,
+  ): Promise<TextChannel[]> {
+    const monitoredChannelIds = this.getMonitoredChannels(guildId);
+    const channels: TextChannel[] = [];
+    for (const channelId of monitoredChannelIds) {
+      const channel = (await botMember.guild.channels.fetch(channelId)) as TextChannel;
+      if (channel?.isTextBased() && this.checkBotPermissions(botMember, channel, requiredPermissions)) {
+        channels.push(channel as TextChannel);
+      }
+    }
+    return channels;
+  }
+
+  public checkBotPermissions(
+    botMember: GuildMember,
+    channel?: TextChannel,
+    requiredPermissions: bigint = PermissionsBitField.Flags.ViewChannel,
+  ): boolean {
+    if (!botMember.permissions.has(requiredPermissions)) {
+      return false;
+    }
+    if (channel && !botMember.permissionsIn(channel).has(requiredPermissions)) {
+      return false;
+    }
+    return true;
   }
 
   public shouldProcessMessage(message: Message): boolean {
@@ -89,11 +126,6 @@ export class ChannelService {
     return null;
   }
 
-  private async isPinned(message: Message): Promise<boolean> {
-    const pinnedMessages = await message.channel.messages.fetchPinned();
-    return pinnedMessages.has(message.id);
-  }
-
   public async processExistingMessages(channel: TextBasedChannel, limit = 10000): Promise<void> {
     let messages: Message[] = [];
     let lastId: string | undefined;
@@ -114,6 +146,18 @@ export class ChannelService {
       if (this.shouldProcessMessage(message)) {
         await this.pinIfNotPinned(message);
       }
+    }
+  }
+
+  public async unpinExistingMessages(channel: TextChannel, limit = 10000): Promise<void> {
+    try {
+      const pinnedMessages = await channel.messages.fetchPinned();
+      const pinnedArray = Array.from(pinnedMessages.values()).slice(0, limit);
+      for (const pinnedMessage of pinnedArray) {
+        await pinnedMessage.unpin();
+      }
+    } catch (error) {
+      console.error(`Erreur lors du désépinglage dans ${channel.id}:`, error);
     }
   }
 }
