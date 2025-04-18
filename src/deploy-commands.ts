@@ -13,12 +13,11 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN ?? '
 
 (async (): Promise<void> => {
   try {
-    console.log('Déploiement des commandes...');
-    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID ?? ''), {
-      body: commands,
-    });
-    console.log('Commandes déployées avec succès.');
+    console.log('Deploying commands...');
+    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID ?? ''), { body: commands });
+    console.log('Commands deployed successfully.');
   } catch (error) {
-    console.error('Erreur lors du déploiement des commandes:', error);
+    console.error('Error deploying commands:', error);
+    process.exit(1);
   }
 })();

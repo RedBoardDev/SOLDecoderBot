@@ -1,24 +1,21 @@
 import { ChannelService } from '@services/channel-service';
 import type { Command } from '@type/command';
-import { type CommandInteraction, SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, type CommandInteraction } from 'discord.js';
 
 const service = new ChannelService();
 
 export const monitor: Command = {
-  data: new SlashCommandBuilder()
-    .setName('monitor')
-    .setDescription('Ajoute le salon actuel à la liste des salons surveillés'),
+  data: new SlashCommandBuilder().setName('monitor').setDescription('Adds the current channel to the monitored list'),
   async execute(interaction: CommandInteraction): Promise<void> {
-    const guildId = interaction.guildId;
-    const channelId = interaction.channelId;
-    if (!guildId || !channelId) {
-      await interaction.reply({
-        content: `Le salon <#${channelId}> a été ajouté à la liste des salons surveillés.`,
-        ephemeral: true,
-      });
+    if (!interaction.guildId || !interaction.channelId) {
+      await interaction.reply({ content: 'This command must be used in a server channel.', ephemeral: true });
       return;
     }
-    service.addChannel(guildId, channelId);
-    await interaction.reply(`Le salon <#${channelId}> a été ajouté à la liste des salons surveillés.`);
+
+    service.addChannel(interaction.guildId, interaction.channelId);
+    await interaction.reply({
+      content: `The channel <#${interaction.channelId}> has been added to the monitored list.`,
+      ephemeral: true,
+    });
   },
 };

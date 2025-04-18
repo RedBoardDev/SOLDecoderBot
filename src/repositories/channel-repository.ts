@@ -4,15 +4,20 @@ import path from 'node:path';
 export class ChannelRepository {
   private static instance: ChannelRepository;
   private readonly channels: Record<string, string[]>;
-  private readonly channelsFile: string = path.join(__dirname, '../../channels.json');
+  private readonly filePath: string = path.join(__dirname, '../../channels.json');
 
   private constructor() {
-    if (fs.existsSync(this.channelsFile)) {
-      const data = fs.readFileSync(this.channelsFile, 'utf8');
-      this.channels = JSON.parse(data) as Record<string, string[]>;
-    } else {
+    try {
+      if (fs.existsSync(this.filePath)) {
+        const data = fs.readFileSync(this.filePath, 'utf8');
+        this.channels = JSON.parse(data) as Record<string, string[]>;
+      } else {
+        this.channels = {};
+        this.save();
+      }
+    } catch (error) {
+      console.error('Error initializing channel repository:', error);
       this.channels = {};
-      this.save();
     }
   }
 
@@ -48,6 +53,10 @@ export class ChannelRepository {
   }
 
   private save(): void {
-    fs.writeFileSync(this.channelsFile, JSON.stringify(this.channels, null, 2), 'utf8');
+    try {
+      fs.writeFileSync(this.filePath, JSON.stringify(this.channels, null, 2), 'utf8');
+    } catch (error) {
+      console.error('Error saving channel data:', error);
+    }
   }
 }

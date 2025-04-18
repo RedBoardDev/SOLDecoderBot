@@ -1,12 +1,6 @@
 import { ChannelRepository } from '@repositories/channel-repository';
-import {
-  EmbedBuilder,
-  type GuildMember,
-  PermissionsBitField,
-  TextChannel,
-  type Message,
-  type TextBasedChannel,
-} from 'discord.js';
+import type { GuildMember, TextChannel, Message, TextBasedChannel } from 'discord.js';
+import { MessageProcessor } from './message-processor';
 
 export class ChannelService {
   private readonly repository: ChannelRepository;
@@ -27,129 +21,58 @@ export class ChannelService {
     return this.repository.getMonitoredChannels(guildId);
   }
 
-  public async fetchMonitoredChannels(
+  public async fetchMonitoredChannelsWithPermissions(
     guildId: string,
     botMember: GuildMember,
-    requiredPermissions: bigint = PermissionsBitField.Flags.ViewChannel,
+    requiredPermissions: bigint,
   ): Promise<TextChannel[]> {
-    const monitoredChannelIds = this.getMonitoredChannels(guildId);
+    const channelIds = this.getMonitoredChannels(guildId);
     const channels: TextChannel[] = [];
-    for (const channelId of monitoredChannelIds) {
-      const channel = (await botMember.guild.channels.fetch(channelId)) as TextChannel;
-      if (channel?.isTextBased() && this.checkBotPermissions(botMember, channel, requiredPermissions)) {
-        channels.push(channel as TextChannel);
+    try {
+      for (const channelId of channelIds) {
+        const channel = await botMember.guild.channels.fetch(channelId);
+        if (channel?.isTextBased() && botMember.permissionsIn(channel).has(requiredPermissions)) {
+          channels.push(channel as TextChannel);
+        }
       }
+    } catch (error) {
+      console.error(`Error fetching channels for guild ${guildId}:`, error);
     }
     return channels;
   }
 
-  public checkBotPermissions(
-    botMember: GuildMember,
-    channel?: TextChannel,
-    requiredPermissions: bigint = PermissionsBitField.Flags.ViewChannel,
-  ): boolean {
-    if (!botMember.permissions.has(requiredPermissions)) {
-      return false;
-    }
-    if (channel && !botMember.permissionsIn(channel).has(requiredPermissions)) {
-      return false;
-    }
-    return true;
-  }
-
   public shouldProcessMessage(message: Message): boolean {
     if (message.author.id === message.client.user?.id) return false;
-    const guildId = message.guildId;
-    const channelId = message.channelId;
-    if (!guildId) return false;
-    const monitoredChannels = this.getMonitoredChannels(guildId);
-    if (!monitoredChannels.includes(channelId)) return false;
-    const hasImage = message.attachments.size > 0;
-    return hasImage;
+    if (!message.guildId || !message.channelId) return false;
+    const monitoredChannels = this.getMonitoredChannels(message.guildId);
+    return monitoredChannels.includes(message.channelId) && message.attachments.size > 0;
   }
 
-  public async pinIfNotPinned(message: Message): Promise<void> {
-    const hasImage = message.attachments.size > 0;
-    if (hasImage && message.channel instanceof TextChannel) {
-      const imageUrl = message.attachments.first()?.url;
-      if (imageUrl) {
-        const previousMessages = await message.channel.messages.fetch({
-          before: message.id,
-          limit: 1,
-        });
-        const previousMessage = previousMessages.first();
-        if (previousMessage) {
-          const content = previousMessage.content.trim();
-          const description = this.getDescription(content);
-          if (description) {
-            const embed = new EmbedBuilder().setDescription(description).setImage(imageUrl);
-            const newMessage = await message.channel.send({ embeds: [embed] });
-            await newMessage.pin();
-            console.log(`Embed pinned: ${newMessage.id} in ${message.channelId}`);
-          }
+  public async processExistingMessages(channel: TextBasedChannel, limit = 10_000): Promise<void> {
+    try {
+      let messages: Message[] = [];
+      let lastId: string | undefined;
+
+      while (messages.length < limit) {
+        const fetched = await channel.messages.fetch({ limit: 100, before: lastId });
+        if (fetched.size === 0) break;
+        messages = messages.concat(Array.from(fetched.values()));
+        lastId = fetched.last()?.id;
+        if (messages.length >= limit) break;
+      }
+
+      messages = messages.slice(0, limit);
+      for (const message of messages) {
+        if (this.shouldProcessMessage(message)) {
+          await MessageProcessor.pinIfNotPinned(message);
         }
       }
+    } catch (error) {
+      console.error(`Error processing messages in channel ${channel.id}:`, error);
     }
   }
 
-  private getDescription(content: string): string | null {
-    const matchPrefixes = ['🛑Stop loss', '🎯Take profit'];
-    for (const prefix of matchPrefixes) {
-      if (content.startsWith(prefix)) {
-        return content;
-      }
-    }
-
-    return this.parseSquareMessage(content);
-  }
-
-  private parseSquareMessage(content: string): string | null {
-    const squarePrefixes = ['🟩', '🟥', '🟨'];
-    for (const square of squarePrefixes) {
-      console.log('t0', content);
-      console.log('t1', content.startsWith(square));
-      if (content.startsWith(square)) {
-        const returnMatch = content.match(/Return:\s*([+-]?\d+\.\d+)%/);
-        if (returnMatch) {
-          const percentage = Number.parseFloat(returnMatch[1]);
-          if (percentage > 0) {
-            return `🟢 Position closed: +${percentage}% profit`;
-          }
-          if (percentage < 0) {
-            return `🔴 Position closed: ${percentage}% loss`;
-          }
-          return '⚪ Position closed: 0% change';
-        }
-        return '⚫ Position closed: PnL unavailable';
-      }
-    }
-    return null;
-  }
-
-  public async processExistingMessages(channel: TextBasedChannel, limit = 10000): Promise<void> {
-    let messages: Message[] = [];
-    let lastId: string | undefined;
-
-    while (messages.length < limit) {
-      const fetched = await channel.messages.fetch({
-        limit: 100,
-        before: lastId,
-      });
-      if (fetched.size === 0) break;
-      messages = messages.concat(Array.from(fetched.values()));
-      lastId = fetched.last()?.id;
-      if (messages.length >= limit) break;
-    }
-
-    messages = messages.slice(0, limit);
-    for (const message of messages) {
-      if (this.shouldProcessMessage(message)) {
-        await this.pinIfNotPinned(message);
-      }
-    }
-  }
-
-  public async unpinExistingMessages(channel: TextChannel, limit = 10000): Promise<void> {
+  public async unpinExistingMessages(channel: TextChannel, limit = 10_000): Promise<void> {
     try {
       const pinnedMessages = await channel.messages.fetchPinned();
       const pinnedArray = Array.from(pinnedMessages.values()).slice(0, limit);
@@ -157,7 +80,7 @@ export class ChannelService {
         await pinnedMessage.unpin();
       }
     } catch (error) {
-      console.error(`Erreur lors du désépinglage dans ${channel.id}:`, error);
+      console.error(`Error unpinning messages in channel ${channel.id}:`, error);
     }
   }
 }

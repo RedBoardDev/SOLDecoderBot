@@ -1,24 +1,23 @@
 import { ChannelService } from '@services/channel-service';
 import type { Command } from '@type/command';
-import { type CommandInteraction, SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, type CommandInteraction } from 'discord.js';
 
 const service = new ChannelService();
 
 export const unmonitor: Command = {
   data: new SlashCommandBuilder()
     .setName('unmonitor')
-    .setDescription('Retire le salon actuel de la liste des salons surveillés'),
+    .setDescription('Removes the current channel from the monitored list'),
   async execute(interaction: CommandInteraction): Promise<void> {
-    const guildId = interaction.guildId;
-    const channelId = interaction.channelId;
-    if (!guildId || !channelId) {
-      await interaction.reply({
-        content: `Le salon <#${channelId}> a été retiré de la liste des salons surveillés.`,
-        ephemeral: true,
-      });
+    if (!interaction.guildId || !interaction.channelId) {
+      await interaction.reply({ content: 'This command must be used in a server channel.', ephemeral: true });
       return;
     }
-    service.removeChannel(guildId, channelId);
-    await interaction.reply(`Le salon <#${channelId}> a été retiré de la liste des salons surveillés.`);
+
+    service.removeChannel(interaction.guildId, interaction.channelId);
+    await interaction.reply({
+      content: `The channel <#${interaction.channelId}> has been removed from the monitored list.`,
+      ephemeral: true,
+    });
   },
 };

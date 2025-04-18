@@ -1,45 +1,44 @@
 import { ChannelService } from '@services/channel-service';
 import type { Command } from '@type/command';
-import { type CommandInteraction, SlashCommandBuilder, PermissionsBitField } from 'discord.js';
+import { SlashCommandBuilder, PermissionsBitField, type CommandInteraction } from 'discord.js';
 
 const service = new ChannelService();
-const MAX_MESSAGES = 10000;
+const MAX_MESSAGES = 10_000;
 
 export const scan: Command = {
-  data: new SlashCommandBuilder().setName('scan').setDescription("Charge et traite jusqu'à 10 000 messages existants"),
+  data: new SlashCommandBuilder().setName('scan').setDescription('Loads and processes up to 10,000 existing messages'),
   async execute(interaction: CommandInteraction): Promise<void> {
-    const guildId = interaction.guildId;
-    if (!guildId) {
-      await interaction.reply('Cette commande doit être utilisée dans un serveur.');
+    if (!interaction.guildId || !interaction.guild) {
+      await interaction.reply({ content: 'This command must be used in a server.', ephemeral: true });
       return;
     }
 
-    const botMember = interaction.guild?.members.me;
+    const botMember = interaction.guild.members.me;
     if (!botMember) {
-      await interaction.reply('Impossible de récupérer les informations du bot.');
+      await interaction.reply({ content: 'Unable to retrieve bot information.', ephemeral: true });
       return;
     }
 
-    if (!service.checkBotPermissions(botMember, undefined, PermissionsBitField.Flags.ViewChannel)) {
-      await interaction.reply("Le bot n'a pas la permission de voir les salons.");
-      return;
-    }
+    const channels = await service.fetchMonitoredChannelsWithPermissions(
+      interaction.guildId,
+      botMember,
+      PermissionsBitField.Flags.ViewChannel,
+    );
 
-    const monitoredChannels = await service.fetchMonitoredChannels(guildId, botMember);
-    if (monitoredChannels.length === 0) {
-      await interaction.reply('Aucun salon surveillé avec les permissions nécessaires.');
+    if (channels.length === 0) {
+      await interaction.reply({ content: 'No monitored channels with required permissions.', ephemeral: true });
       return;
     }
 
     await interaction.deferReply({ ephemeral: true });
     try {
-      for (const channel of monitoredChannels) {
+      for (const channel of channels) {
         await service.processExistingMessages(channel, MAX_MESSAGES);
       }
-      await interaction.editReply('Traitement terminé.');
+      await interaction.editReply('Processing completed successfully.');
     } catch (error) {
-      console.error('Erreur lors du traitement des messages:', error);
-      await interaction.editReply('Erreur lors du traitement.');
+      console.error('Error processing messages:', error);
+      await interaction.editReply('An error occurred during processing.');
     }
   },
 };

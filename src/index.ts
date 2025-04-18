@@ -21,7 +21,7 @@ declare module 'discord.js' {
 }
 
 client.commands = new Collection<string, Command>();
-const commands = [monitor, unmonitor, scan, clear, monitored];
+const commands: Command[] = [monitor, unmonitor, scan, clear, monitored];
 for (const command of commands) {
   client.commands.set(command.data.name, command);
 }
@@ -37,9 +37,9 @@ client.on('interactionCreate', async (interaction) => {
   try {
     await command.execute(interaction);
   } catch (error) {
-    console.error(error);
+    console.error(`Error executing command ${interaction.commandName}:`, error);
     await interaction.reply({
-      content: 'Erreur lors de l’exécution de la commande.',
+      content: 'An error occurred while executing the command.',
       ephemeral: true,
     });
   }
@@ -48,6 +48,6 @@ client.on('interactionCreate', async (interaction) => {
 client.on('messageCreate', messageCreate);
 
 client.login(process.env.DISCORD_TOKEN).catch((error) => {
-  console.error('Erreur lors de la connexion du bot:', error);
+  console.error('Error logging in bot:', error);
   process.exit(1);
 });
