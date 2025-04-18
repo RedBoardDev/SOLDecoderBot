@@ -4,21 +4,21 @@ import { type CommandInteraction, SlashCommandBuilder } from 'discord.js';
 
 const service = new ChannelService();
 
-export const add: Command = {
+export const unmonitor: Command = {
   data: new SlashCommandBuilder()
-    .setName('add')
-    .setDescription('Ajoute le salon actuel à la liste des salons surveillés'),
+    .setName('unmonitor')
+    .setDescription('Retire le salon actuel de la liste des salons surveillés'),
   async execute(interaction: CommandInteraction): Promise<void> {
     const guildId = interaction.guildId;
     const channelId = interaction.channelId;
     if (!guildId || !channelId) {
       await interaction.reply({
-        content: `Le salon <#${channelId}> a été ajouté à la liste des salons surveillés.`,
+        content: `Le salon <#${channelId}> a été retiré de la liste des salons surveillés.`,
         ephemeral: true,
       });
       return;
     }
-    service.addChannel(guildId, channelId);
-    await interaction.reply(`Le salon <#${channelId}> a été ajouté à la liste des salons surveillés.`);
+    service.removeChannel(guildId, channelId);
+    await interaction.reply(`Le salon <#${channelId}> a été retiré de la liste des salons surveillés.`);
   },
 };

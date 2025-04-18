@@ -1,8 +1,8 @@
-import { add } from '@commands/add';
-import { list } from '@commands/list';
-import { load } from '@commands/load';
-import { unload } from '@commands/unload';
-import { remove } from '@commands/remove';
+import { monitor } from '@commands/monitor';
+import { monitored } from '@commands/monitored';
+import { scan } from '@commands/scan';
+import { clear } from '@commands/clear';
+import { unmonitor } from '@commands/unmonitor';
 import { messageCreate } from '@events/message-create';
 import type { Command } from '@type/command';
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
@@ -21,7 +21,7 @@ declare module 'discord.js' {
 }
 
 client.commands = new Collection<string, Command>();
-const commands = [add, remove, load, unload, list];
+const commands = [monitor, unmonitor, scan, clear, monitored];
 for (const command of commands) {
   client.commands.set(command.data.name, command);
 }

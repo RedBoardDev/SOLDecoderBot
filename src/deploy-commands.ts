@@ -1,14 +1,14 @@
-import { add } from '@commands/add';
-import { list } from '@commands/list';
-import { load } from '@commands/load';
-import { unload } from '@commands/unload';
-import { remove } from '@commands/remove';
+import { monitor } from '@commands/monitor';
+import { monitored } from '@commands/monitored';
+import { scan } from '@commands/scan';
+import { clear } from '@commands/clear';
+import { unmonitor } from '@commands/unmonitor';
 import { REST, Routes } from 'discord.js';
 import { config } from 'dotenv';
 
 config();
 
-const commands = [add, remove, load, unload, list].map((command) => command.data.toJSON());
+const commands = [monitor, unmonitor, scan, clear, monitored].map((command) => command.data.toJSON());
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN ?? '');
 
 (async (): Promise<void> => {

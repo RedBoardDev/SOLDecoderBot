@@ -5,8 +5,8 @@ import { type CommandInteraction, SlashCommandBuilder, PermissionsBitField } fro
 const service = new ChannelService();
 const MAX_MESSAGES = 10000;
 
-export const load: Command = {
-  data: new SlashCommandBuilder().setName('load').setDescription("Charge et traite jusqu'à 10 000 messages existants"),
+export const scan: Command = {
+  data: new SlashCommandBuilder().setName('scan').setDescription("Charge et traite jusqu'à 10 000 messages existants"),
   async execute(interaction: CommandInteraction): Promise<void> {
     const guildId = interaction.guildId;
     if (!guildId) {

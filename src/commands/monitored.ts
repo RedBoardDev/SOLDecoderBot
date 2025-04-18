@@ -4,8 +4,8 @@ import { type CommandInteraction, SlashCommandBuilder } from 'discord.js';
 
 const service = new ChannelService();
 
-export const list: Command = {
-  data: new SlashCommandBuilder().setName('list').setDescription('Liste tous les salons surveillés dans ce serveur'),
+export const monitored: Command = {
+  data: new SlashCommandBuilder().setName('monitored').setDescription('Liste tous les salons surveillés dans ce serveur'),
   async execute(interaction: CommandInteraction): Promise<void> {
     const guildId = interaction.guildId;
     if (!guildId) {

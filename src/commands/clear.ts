@@ -5,9 +5,9 @@ import { type CommandInteraction, SlashCommandBuilder, PermissionsBitField } fro
 const service = new ChannelService();
 const MAX_MESSAGES = 10000;
 
-export const unload: Command = {
+export const clear: Command = {
   data: new SlashCommandBuilder()
-    .setName('unload')
+    .setName('clear')
     .setDescription("Désépingle jusqu'à 10 000 messages dans les salons surveillés"),
   async execute(interaction: CommandInteraction): Promise<void> {
     const guildId = interaction.guildId;
