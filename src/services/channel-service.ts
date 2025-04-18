@@ -21,24 +21,20 @@ export class ChannelService {
     return this.repository.getMonitoredChannels(guildId);
   }
 
-  public async fetchMonitoredChannelsWithPermissions(
-    guildId: string,
+  public async fetchChannelWithPermissions(
+    channelId: string,
     botMember: GuildMember,
     requiredPermissions: bigint,
-  ): Promise<TextChannel[]> {
-    const channelIds = this.getMonitoredChannels(guildId);
-    const channels: TextChannel[] = [];
+  ): Promise<TextChannel | null> {
     try {
-      for (const channelId of channelIds) {
-        const channel = await botMember.guild.channels.fetch(channelId);
-        if (channel?.isTextBased() && botMember.permissionsIn(channel).has(requiredPermissions)) {
-          channels.push(channel as TextChannel);
-        }
+      const channel = await botMember.guild.channels.fetch(channelId);
+      if (channel?.isTextBased() && botMember.permissionsIn(channel).has(requiredPermissions)) {
+        return channel as TextChannel;
       }
     } catch (error) {
-      console.error(`Error fetching channels for guild ${guildId}:`, error);
+      console.error(`Error fetching channel ${channelId}:`, error);
     }
-    return channels;
+    return null;
   }
 
   public shouldProcessMessage(message: Message): boolean {

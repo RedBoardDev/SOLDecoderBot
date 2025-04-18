@@ -6,10 +6,12 @@ const service = new ChannelService();
 const MAX_MESSAGES = 10_000;
 
 export const clear: Command = {
-  data: new SlashCommandBuilder().setName('clear').setDescription('Unpins up to 10,000 messages in monitored channels'),
+  data: new SlashCommandBuilder()
+    .setName('clear')
+    .setDescription('Unpins up to 10,000 messages in the current channel'),
   async execute(interaction: CommandInteraction): Promise<void> {
-    if (!interaction.guildId || !interaction.guild) {
-      await interaction.reply({ content: 'This command must be used in a server.', ephemeral: true });
+    if (!interaction.guildId || !interaction.guild || !interaction.channelId) {
+      await interaction.reply({ content: 'This command must be used in a server channel.', ephemeral: true });
       return;
     }
 
@@ -19,23 +21,24 @@ export const clear: Command = {
       return;
     }
 
-    const channels = await service.fetchMonitoredChannelsWithPermissions(
-      interaction.guildId,
+    const channel = await service.fetchChannelWithPermissions(
+      interaction.channelId,
       botMember,
       PermissionsBitField.Flags.ManageMessages,
     );
 
-    if (channels.length === 0) {
-      await interaction.reply({ content: 'No monitored channels with required permissions.', ephemeral: true });
+    if (!channel) {
+      await interaction.reply({
+        content: 'The bot does not have permission to manage messages in this channel.',
+        ephemeral: true,
+      });
       return;
     }
 
     await interaction.deferReply({ ephemeral: true });
     try {
-      for (const channel of channels) {
-        await service.unpinExistingMessages(channel, MAX_MESSAGES);
-      }
-      await interaction.editReply('Unpinning completed successfully.');
+      await service.unpinExistingMessages(channel, MAX_MESSAGES);
+      await interaction.editReply('Unpinning completed successfully in this channel.');
     } catch (error) {
       console.error('Error unpinning messages:', error);
       await interaction.editReply('An error occurred during unpinning.');
