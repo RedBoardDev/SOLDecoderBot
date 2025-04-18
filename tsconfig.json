@@ -13,7 +13,6 @@
       "@events/*": ["events/*"],
       "@services/*": ["services/*"],
       "@repositories/*": ["repositories/*"],
-      "@utils/*": ["utils/*"],
     }
   },
   "include": ["src/**/*"],

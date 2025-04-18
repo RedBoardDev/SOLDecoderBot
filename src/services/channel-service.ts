@@ -1,14 +1,11 @@
 import { ChannelRepository } from '@repositories/channel-repository';
-import { type Config, loadConfig } from '@utils/config-loader';
-import type { Message, TextBasedChannel } from 'discord.js';
+import { EmbedBuilder, TextChannel, type Message, type TextBasedChannel } from 'discord.js';
 
 export class ChannelService {
   private readonly repository: ChannelRepository;
-  private readonly config: Config;
 
   constructor() {
     this.repository = ChannelRepository.getInstance();
-    this.config = loadConfig();
   }
 
   public addChannel(guildId: string, channelId: string): void {
@@ -30,15 +27,66 @@ export class ChannelService {
     if (!guildId) return false;
     const monitoredChannels = this.getMonitoredChannels(guildId);
     if (!monitoredChannels.includes(channelId)) return false;
-    const content = message.content.trim();
-    return this.config.matchPrefixes.some((prefix) => content.startsWith(prefix));
+    const hasImage = message.attachments.size > 0;
+    return hasImage;
   }
 
   public async pinIfNotPinned(message: Message): Promise<void> {
-    if (!(await this.isPinned(message))) {
-      await message.pin();
-      console.log(`Message épinglé : ${message.id} dans ${message.channelId}`);
+    const hasImage = message.attachments.size > 0;
+    if (hasImage && message.channel instanceof TextChannel) {
+      const imageUrl = message.attachments.first()?.url;
+      if (imageUrl) {
+        const previousMessages = await message.channel.messages.fetch({
+          before: message.id,
+          limit: 1,
+        });
+        const previousMessage = previousMessages.first();
+        if (previousMessage) {
+          const content = previousMessage.content.trim();
+          const description = this.getDescription(content);
+          if (description) {
+            const embed = new EmbedBuilder().setDescription(description).setImage(imageUrl);
+            const newMessage = await message.channel.send({ embeds: [embed] });
+            await newMessage.pin();
+            console.log(`Embed pinned: ${newMessage.id} in ${message.channelId}`);
+          }
+        }
+      }
     }
+  }
+
+  private getDescription(content: string): string | null {
+    const matchPrefixes = ['🛑Stop loss', '🎯Take profit'];
+    for (const prefix of matchPrefixes) {
+      if (content.startsWith(prefix)) {
+        return content;
+      }
+    }
+
+    return this.parseSquareMessage(content);
+  }
+
+  private parseSquareMessage(content: string): string | null {
+    const squarePrefixes = ['🟩', '🟥', '🟨'];
+    for (const square of squarePrefixes) {
+      console.log('t0', content);
+      console.log('t1', content.startsWith(square));
+      if (content.startsWith(square)) {
+        const returnMatch = content.match(/Return:\s*([+-]?\d+\.\d+)%/);
+        if (returnMatch) {
+          const percentage = Number.parseFloat(returnMatch[1]);
+          if (percentage > 0) {
+            return `🟢 Position closed: +${percentage}% profit`;
+          }
+          if (percentage < 0) {
+            return `🔴 Position closed: ${percentage}% loss`;
+          }
+          return '⚪ Position closed: 0% change';
+        }
+        return '⚫ Position closed: PnL unavailable';
+      }
+    }
+    return null;
   }
 
   private async isPinned(message: Message): Promise<boolean> {
