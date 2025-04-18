@@ -34,7 +34,7 @@ export const scan: Command = {
 
     await interaction.deferReply({ ephemeral: true });
     try {
-      await service.processExistingMessages(channel, MAX_MESSAGES);
+      await service.processExistingMessages(channel, MAX_MESSAGES, true);
       await interaction.editReply('Processing completed successfully in this channel.');
     } catch (error) {
       console.error('Error processing messages:', error);

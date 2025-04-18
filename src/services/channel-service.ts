@@ -37,14 +37,21 @@ export class ChannelService {
     return null;
   }
 
-  public shouldProcessMessage(message: Message): boolean {
+  public shouldProcessMessage(message: Message, ignoreMonitoring = false): boolean {
     if (message.author.id === message.client.user?.id) return false;
     if (!message.guildId || !message.channelId) return false;
-    const monitoredChannels = this.getMonitoredChannels(message.guildId);
-    return monitoredChannels.includes(message.channelId) && message.attachments.size > 0;
+    if (!ignoreMonitoring) {
+      const monitoredChannels = this.getMonitoredChannels(message.guildId);
+      if (!monitoredChannels.includes(message.channelId)) return false;
+    }
+    return message.attachments.size > 0;
   }
 
-  public async processExistingMessages(channel: TextBasedChannel, limit = 10_000): Promise<void> {
+  public async processExistingMessages(
+    channel: TextBasedChannel,
+    limit = 10_000,
+    ignoreMonitoring = false,
+  ): Promise<void> {
     try {
       let messages: Message[] = [];
       let lastId: string | undefined;
@@ -58,11 +65,16 @@ export class ChannelService {
       }
 
       messages = messages.slice(0, limit);
+      console.log(`Fetched ${messages.length} messages from channel ${channel.id}`);
+
+      let processedCount = 0;
       for (const message of messages) {
-        if (this.shouldProcessMessage(message)) {
+        if (this.shouldProcessMessage(message, ignoreMonitoring)) {
           await MessageProcessor.pinIfNotPinned(message);
+          processedCount++;
         }
       }
+      console.log(`Processed ${processedCount} messages in channel ${channel.id}`);
     } catch (error) {
       console.error(`Error processing messages in channel ${channel.id}:`, error);
     }
