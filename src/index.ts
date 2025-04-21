@@ -5,17 +5,17 @@ import { clear } from '@commands/clear';
 import { unmonitor } from '@commands/unmonitor';
 import { help } from '@commands/help';
 import { settings } from '@commands/settings';
+import { example } from '@commands/example';
 import { messageCreate } from '@events/message-create';
 import type { Command } from '@type/command';
-import {
-  Client,
-  Collection,
-  GatewayIntentBits,
-  type GuildMember,
-  PermissionsBitField,
-  type ChatInputCommandInteraction,
-} from 'discord.js';
+import { Client, Collection, GatewayIntentBits, type ChatInputCommandInteraction } from 'discord.js';
 import { config } from 'dotenv';
+import { logger, LogLevel } from './utils/logger';
+import { handleCommandError } from './utils/error-handler';
+import { requireAdmin } from './utils/command-guards';
+
+const isProduction = process.env.NODE_ENV === 'production';
+logger.setLevel(isProduction ? LogLevel.INFO : LogLevel.DEBUG);
 
 config();
 
@@ -30,13 +30,13 @@ declare module 'discord.js' {
 }
 
 client.commands = new Collection<string, Command>();
-const commands: Command[] = [monitor, unmonitor, scan, clear, monitored, help, settings];
+const commands: Command[] = [monitor, unmonitor, scan, clear, monitored, help, settings, example];
 for (const command of commands) {
   client.commands.set(command.data.name, command);
 }
 
 client.once('ready', () => {
-  console.log(`Logged in as ${client.user?.tag}`);
+  logger.info(`Bot is ready! Logged in as ${client.user?.tag}`);
 });
 
 client.on('interactionCreate', async (interaction) => {
@@ -45,31 +45,36 @@ client.on('interactionCreate', async (interaction) => {
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
 
-  const member = interaction.member as GuildMember;
-  if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-    await interaction.reply({
-      content: 'You do not have permission to use this command. Only administrators can execute commands.',
-      ephemeral: true,
-    });
-    return;
-  }
-
   try {
+    requireAdmin(interaction);
+
+    logger.debug('Executing command', {
+      command: interaction.commandName,
+      user: interaction.user.tag,
+      channelId: interaction.channelId,
+    });
+
     await command.execute(interaction as ChatInputCommandInteraction);
   } catch (error) {
-    console.error(`Error executing command ${interaction.commandName}:`, error);
-    if (!interaction.replied) {
-      await interaction.reply({
-        content: 'An error occurred while executing the command.',
-        ephemeral: true,
-      });
-    }
+    await handleCommandError(error, interaction as ChatInputCommandInteraction);
   }
 });
 
 client.on('messageCreate', messageCreate);
 
+process.on('unhandledRejection', (error) => {
+  logger.error('Unhandled promise rejection', error as Error);
+});
+
+process.on('uncaughtException', (error) => {
+  logger.fatal('Uncaught exception', error);
+  if (isProduction) {
+    client.destroy();
+    process.exit(1);
+  }
+});
+
 client.login(process.env.DISCORD_TOKEN).catch((error) => {
-  console.error('Error logging in bot:', error);
+  logger.fatal('Failed to login to Discord', error as Error);
   process.exit(1);
 });

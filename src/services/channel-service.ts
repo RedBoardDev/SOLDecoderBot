@@ -1,7 +1,7 @@
 import { ChannelRepository } from '@repositories/channel-repository';
 import type { GuildMember, TextChannel, Message, TextBasedChannel } from 'discord.js';
 import { MessageProcessor } from './message-processor';
-import { ChannelSettings } from '@type/channel-settings';
+import type { ChannelSettings } from '@type/channel-settings';
 
 export class ChannelService {
   private repo = ChannelRepository.getInstance();
@@ -14,18 +14,11 @@ export class ChannelService {
     return this.repo.getMonitoredChannels(guildId);
   }
 
-  public getChannelSettings(
-    guildId: string,
-    channelId: string
-  ): ChannelSettings {
+  public getChannelSettings(guildId: string, channelId: string): ChannelSettings {
     return this.repo.getChannelSettings(guildId, channelId);
   }
 
-  public updateSettings(
-    guildId: string,
-    channelId: string,
-    settings: Partial<ChannelSettings>
-  ): void {
+  public updateSettings(guildId: string, channelId: string, settings: Partial<ChannelSettings>): void {
     this.repo.updateChannelSettings(guildId, channelId, settings);
   }
 
@@ -105,7 +98,7 @@ export class ChannelService {
     }
   }
 
-  public async deleteBotMessages(channel: TextChannel, limit: number = 10_000): Promise<void> {
+  public async deleteBotMessages(channel: TextChannel, limit = 10_000): Promise<void> {
     try {
       let messages: Message[] = [];
       let lastId: string | undefined;
@@ -143,7 +136,7 @@ export class ChannelService {
       if (pinnedMessages.size >= maxPins) {
         // Find the oldest pinned message (highest ID, as IDs increase over time)
         const oldestPin = pinnedMessages.reduce((oldest, current) =>
-          BigInt(current.id) < BigInt(oldest.id) ? current : oldest
+          BigInt(current.id) < BigInt(oldest.id) ? current : oldest,
         );
         await oldestPin.unpin();
         console.log(`Unpinned oldest message ${oldestPin.id} to maintain pin limit in channel ${channel.id}`);
