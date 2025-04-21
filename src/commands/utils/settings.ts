@@ -1,5 +1,5 @@
-import { ChannelSettings } from '@type/channel-settings';
-import {
+import type { ChannelSettings } from '@type/channel-settings';
+import type {
   SlashCommandBuilder,
   SlashCommandOptionsOnlyBuilder,
   SlashCommandBooleanOption,
@@ -11,32 +11,22 @@ import {
  * Ajoute les options communes (image, tag).
  * - tag: soit mention, soit 'false'
  */
-export function addSettingsOptions(
-  builder: SlashCommandBuilder
-): SlashCommandBuilder;
-export function addSettingsOptions(
-  builder: SlashCommandOptionsOnlyBuilder
-): SlashCommandOptionsOnlyBuilder;
+export function addSettingsOptions(builder: SlashCommandBuilder): SlashCommandBuilder;
+export function addSettingsOptions(builder: SlashCommandOptionsOnlyBuilder): SlashCommandOptionsOnlyBuilder;
 export function addSettingsOptions(builder: any): any {
   return builder
     .addBooleanOption((opt: SlashCommandBooleanOption) =>
-      opt
-        .setName('image')
-        .setDescription('Afficher comme embed image')
+      opt.setName('image').setDescription('Display as embedded image'),
     )
     .addStringOption((opt: SlashCommandStringOption) =>
-      opt
-        .setName('tag')
-        .setDescription("Mention d'user/role, ou 'false' pour retirer")
+      opt.setName('tag').setDescription("User/role mention, or 'false' to remove"),
     );
 }
 
 /**
- * Extrait settings de l'interaction.
+ * Extracts settings from interaction.
  */
-export function getSettingsFromInteraction(
-  interaction: ChatInputCommandInteraction
-): Partial<ChannelSettings> {
+export function getSettingsFromInteraction(interaction: ChatInputCommandInteraction): Partial<ChannelSettings> {
   const img = interaction.options.getBoolean('image');
   const tagRaw = interaction.options.getString('tag');
   const settings: Partial<ChannelSettings> = {};
@@ -48,7 +38,7 @@ export function getSettingsFromInteraction(
     if (tagRaw.toLowerCase() === 'false') {
       settings.tag = false;
     } else {
-      // <@123> ou <@&456>
+      // <@123> or <@&456>
       const mUser = tagRaw.match(/^<@!(\d+)>$/) || tagRaw.match(/^<@(\d+)>$/);
       const mRole = tagRaw.match(/^<@&(\d+)>$/);
       if (mRole) {
@@ -63,24 +53,18 @@ export function getSettingsFromInteraction(
 }
 
 /**
- * Formatte image & tag pour affichage.
+ * Formats image & tag for display.
  */
-export function formatSettingsParts(
-  settings: Partial<ChannelSettings>
-): string[] {
+export function formatSettingsParts(settings: Partial<ChannelSettings>): string[] {
   const parts: string[] = [];
   if ('image' in settings) {
-    parts.push(`Image : ${settings.image}`);
+    parts.push(`Image: ${settings.image}`);
   }
   if ('tag' in settings) {
     parts.push(
       settings.tag
-        ? `Tag : ${
-            settings.tag.type === 'role'
-              ? `<@&${settings.tag.id}>`
-              : `<@${settings.tag.id}>`
-          }`
-        : 'Tag : false'
+        ? `Tag: ${settings.tag.type === 'role' ? `<@&${settings.tag.id}>` : `<@${settings.tag.id}>`}`
+        : 'Tag: false',
     );
   }
   return parts;

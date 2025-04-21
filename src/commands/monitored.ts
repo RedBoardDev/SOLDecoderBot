@@ -1,8 +1,4 @@
-import {
-  SlashCommandBuilder,
-  EmbedBuilder,
-  ChatInputCommandInteraction,
-} from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, type ChatInputCommandInteraction } from 'discord.js';
 import type { Command } from '@type/command';
 import { ChannelService } from '@services/channel-service';
 import { formatSettingsParts } from './utils/settings';
@@ -17,7 +13,7 @@ export const monitored: Command = {
     const guildId = interaction.guildId;
     if (!guildId) {
       await interaction.reply({
-        content: 'Doit être appelé dans un serveur.',
+        content: 'This command must be used in a server.',
         ephemeral: true,
       });
       return;
@@ -26,15 +22,13 @@ export const monitored: Command = {
     const channelIds = service.getMonitoredChannels(guildId);
     if (channelIds.length === 0) {
       await interaction.reply({
-        content: 'Aucun salon surveillé.',
+        content: 'No monitored channels found.',
         ephemeral: true,
       });
       return;
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle('Salons surveillés')
-      .setDescription('🔧 Paramètres par salon :');
+    const embed = new EmbedBuilder().setTitle('Monitored Channels').setDescription('🔧 Channel settings:');
 
     const fields = channelIds.map((cid) => {
       const settings = service.getChannelSettings(guildId, cid);
