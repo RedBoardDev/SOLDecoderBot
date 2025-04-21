@@ -24,11 +24,11 @@ export const scan: Command = {
     const channel = await service.fetchChannelWithPermissions(
       interaction.channelId,
       botMember,
-      PermissionsBitField.Flags.ViewChannel,
+      PermissionsBitField.Flags.ViewChannel | PermissionsBitField.Flags.ManageMessages, // Scan needs both
     );
 
     if (!channel) {
-      await interaction.reply({ content: 'The bot does not have permission to view this channel.', ephemeral: true });
+      await interaction.reply({ content: 'The bot does not have permission to view or manage messages in this channel.', ephemeral: true });
       return;
     }
 
@@ -38,7 +38,7 @@ export const scan: Command = {
       await interaction.editReply('Processing completed successfully in this channel.');
     } catch (error) {
       console.error('Error processing messages:', error);
-      await interaction.editReply('An error occurred during processing.');
+      await interaction.editReply('An error occurred during processing. Check the pin limit or permissions.');
     }
   },
 };

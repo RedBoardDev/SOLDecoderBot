@@ -1,6 +1,8 @@
 import { EmbedBuilder, TextChannel, type Message } from 'discord.js';
 
 export class MessageProcessor {
+  private static readonly MAX_PINS = 45; // Maximum number of pins to maintain (buffer to avoid hitting 50)
+
   public static async pinIfNotPinned(message: Message): Promise<void> {
     if (!(message.channel instanceof TextChannel) || message.attachments.size === 0) return;
 
@@ -14,6 +16,9 @@ export class MessageProcessor {
 
       const description = this.getDescription(previousMessage.content.trim());
       if (description) {
+        // Check pinned message count and remove oldest if necessary
+        await this.managePinnedMessages(message.channel);
+
         const embed = new EmbedBuilder().setDescription(description).setImage(imageUrl);
         const newMessage = await message.channel.send({ embeds: [embed] });
         await newMessage.pin();
@@ -21,6 +26,22 @@ export class MessageProcessor {
       }
     } catch (error) {
       console.error(`Error pinning message in channel ${message.channelId}:`, error);
+    }
+  }
+
+  private static async managePinnedMessages(channel: TextChannel): Promise<void> {
+    try {
+      const pinnedMessages = await channel.messages.fetchPinned();
+      if (pinnedMessages.size >= this.MAX_PINS) {
+        // The oldest pinned message is the last one in the collection (least recently pinned)
+        const oldestMessage = pinnedMessages.last();
+        if (oldestMessage) {
+          await oldestMessage.unpin();
+          console.log(`Unpinned oldest pinned message ${oldestMessage.id} in channel ${channel.id}`);
+        }
+      }
+    } catch (error) {
+      console.error(`Error managing pinned messages in channel ${channel.id}:`, error);
     }
   }
 
