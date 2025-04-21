@@ -5,7 +5,6 @@ import { clear } from '@commands/clear';
 import { unmonitor } from '@commands/unmonitor';
 import { help } from '@commands/help';
 import { settings } from '@commands/settings';
-import { example } from '@commands/example';
 import { messageCreate } from '@events/message-create';
 import type { Command } from '@type/command';
 import { Client, Collection, GatewayIntentBits, type ChatInputCommandInteraction } from 'discord.js';
@@ -14,10 +13,16 @@ import { logger, LogLevel } from './utils/logger';
 import { handleCommandError } from './utils/error-handler';
 import { requireAdmin } from './utils/command-guards';
 
+config();
+
 const isProduction = process.env.NODE_ENV === 'production';
 logger.setLevel(isProduction ? LogLevel.INFO : LogLevel.DEBUG);
 
-config();
+logger.info('Bot starting up', {
+  environment: isProduction ? 'production' : 'development',
+  nodeVersion: process.version,
+  platform: process.platform,
+});
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -30,7 +35,7 @@ declare module 'discord.js' {
 }
 
 client.commands = new Collection<string, Command>();
-const commands: Command[] = [monitor, unmonitor, scan, clear, monitored, help, settings, example];
+const commands: Command[] = [monitor, unmonitor, scan, clear, monitored, help, settings];
 for (const command of commands) {
   client.commands.set(command.data.name, command);
 }

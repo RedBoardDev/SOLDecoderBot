@@ -8,19 +8,12 @@ import {
 import { PermissionError, ChannelError } from './error-handler';
 import { logger } from './logger';
 
-/**
- * Ensure the command is being used in a guild
- */
 export function requireGuild(interaction: ChatInputCommandInteraction): void {
   if (!interaction.guild || !interaction.guildId) {
     throw new ChannelError('This command must be used in a server.');
   }
 }
 
-/**
- * Ensure the command is being used in a text channel
- * @returns The validated text channel
- */
 export function requireTextChannel(interaction: ChatInputCommandInteraction): TextChannel {
   requireGuild(interaction);
 
@@ -32,10 +25,6 @@ export function requireTextChannel(interaction: ChatInputCommandInteraction): Te
   return channel;
 }
 
-/**
- * Ensure the user has administrator permissions
- * @returns The member with validated permissions
- */
 export function requireAdmin(interaction: ChatInputCommandInteraction): GuildMember {
   requireGuild(interaction);
 
@@ -52,10 +41,6 @@ export function requireAdmin(interaction: ChatInputCommandInteraction): GuildMem
   return member;
 }
 
-/**
- * Ensure the user has specific permissions
- * @returns The member with validated permissions
- */
 export function requirePermissions(
   interaction: ChatInputCommandInteraction,
   permissions: bigint | bigint[],
@@ -65,8 +50,14 @@ export function requirePermissions(
   const member = interaction.member as GuildMember;
   if (!member.permissions.has(permissions)) {
     const permNames = Array.isArray(permissions)
-      ? permissions.map((p) => PermissionsBitField.Flags[p.toString()])
-      : [PermissionsBitField.Flags[permissions.toString()]];
+      ? permissions.map((p) => {
+          const flag = Object.entries(PermissionsBitField.Flags).find(([_, value]) => value === p);
+          return flag ? flag[0] : 'Unknown Permission';
+        })
+      : [
+          Object.entries(PermissionsBitField.Flags).find(([_, value]) => value === permissions)?.[0] ??
+            'Unknown Permission',
+        ];
 
     logger.warn('Permission denied', {
       userId: interaction.user.id,
@@ -81,10 +72,6 @@ export function requirePermissions(
   return member;
 }
 
-/**
- * Ensure the bot has required permissions in the channel
- * @returns The bot member with validated permissions
- */
 export function requireBotPermissions(
   interaction: ChatInputCommandInteraction,
   permissions: bigint | bigint[],
@@ -98,8 +85,14 @@ export function requireBotPermissions(
 
   if (!botMember.permissions.has(permissions)) {
     const permNames = Array.isArray(permissions)
-      ? permissions.map((p) => PermissionsBitField.Flags[p.toString()])
-      : [PermissionsBitField.Flags[permissions.toString()]];
+      ? permissions.map((p) => {
+          const flag = Object.entries(PermissionsBitField.Flags).find(([_, value]) => value === p);
+          return flag ? flag[0] : 'Unknown Permission';
+        })
+      : [
+          Object.entries(PermissionsBitField.Flags).find(([_, value]) => value === permissions)?.[0] ??
+            'Unknown Permission',
+        ];
 
     logger.warn('Bot permission denied', {
       channelId: interaction.channelId,
@@ -113,9 +106,6 @@ export function requireBotPermissions(
   return botMember;
 }
 
-/**
- * Ensure a parameter is valid
- */
 export function requireParameter<T>(value: T | null | undefined, paramName: string): T {
   if (value === null || value === undefined) {
     throw new Error(`Required parameter "${paramName}" is missing`);
@@ -123,9 +113,6 @@ export function requireParameter<T>(value: T | null | undefined, paramName: stri
   return value;
 }
 
-/**
- * Ensure a valid channel within rate limits
- */
 export function validateRateLimit(
   interaction: ChatInputCommandInteraction,
   rateMap: Map<string, number>,

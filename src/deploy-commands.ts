@@ -5,14 +5,13 @@ import { clear } from '@commands/clear';
 import { unmonitor } from '@commands/unmonitor';
 import { help } from '@commands/help';
 import { settings } from '@commands/settings';
-import { example } from '@commands/example';
 import { REST, Routes } from 'discord.js';
 import { config } from 'dotenv';
 import { logger } from './utils/logger';
 
 config();
 
-const commands = [monitor, unmonitor, scan, clear, monitored, help, settings, example].map((command) =>
+const commands = [monitor, unmonitor, scan, clear, monitored, help, settings].map((command) =>
   command.data.toJSON(),
 );
 

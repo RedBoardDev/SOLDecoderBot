@@ -1,7 +1,6 @@
 import { logger } from './logger';
 import type { CommandInteraction, Message } from 'discord.js';
 
-// Base Discord Bot Error
 export class DiscordBotError extends Error {
   constructor(message: string) {
     super(message);
@@ -10,7 +9,6 @@ export class DiscordBotError extends Error {
   }
 }
 
-// Specific error types
 export class PermissionError extends DiscordBotError {
   constructor(message = 'You do not have the required permissions for this action') {
     super(message);
@@ -47,29 +45,23 @@ export class DatabaseError extends DiscordBotError {
   }
 }
 
-// Handler for interaction commands
 export async function handleCommandError(error: unknown, interaction: CommandInteraction): Promise<void> {
-  // Log the error
   logError('Command execution error', error, {
     commandName: interaction.commandName,
     channelId: interaction.channelId,
     userId: interaction.user.id,
   });
 
-  // Prepare user-facing error message
   let userMessage = 'An unexpected error occurred. Please try again later.';
 
   if (error instanceof DiscordBotError) {
     userMessage = error.message;
   } else if (error instanceof Error) {
-    // Generic error with custom message
     logger.error(`Unhandled error type: ${error.name}`, error);
   } else {
-    // Unknown error type
     logger.error('Unknown error type', new Error('Unknown error structure'));
   }
 
-  // Reply to user or edit reply if already replied
   try {
     if (interaction.deferred) {
       await interaction.editReply({ content: userMessage });
@@ -81,19 +73,14 @@ export async function handleCommandError(error: unknown, interaction: CommandInt
   }
 }
 
-// Handler for message events
 export async function handleMessageError(error: unknown, message: Message): Promise<void> {
-  // Log the error
   logError('Message processing error', error, {
     channelId: message.channelId,
     messageId: message.id,
     userId: message.author.id,
   });
-
-  // No automatic user response for message errors to avoid spam
 }
 
-// Generic error logging helper
 export function logError(context: string, error: unknown, metadata?: Record<string, unknown>): void {
   if (error instanceof Error) {
     logger.error(context, error, metadata);
@@ -104,7 +91,6 @@ export function logError(context: string, error: unknown, metadata?: Record<stri
   }
 }
 
-// Helper to safely stringify errors, even circular ones
 export function safeStringify(obj: unknown): string {
   try {
     const cache = new Set();
