@@ -1,4 +1,5 @@
 import { ChannelRepository } from '@repositories/channel-repository';
+import { ChannelSettings } from '@type/channel-settings';
 import {
   EmbedBuilder,
   TextChannel,
@@ -52,7 +53,7 @@ export class MessageProcessor {
 
   private static async sendPin(
     channel: TextChannel,
-    settings: { image: boolean; tag?: { type: 'user' | 'role'; id: string } },
+    settings: ChannelSettings,
     description: string,
     imageUrl: string
   ): Promise<Message> {

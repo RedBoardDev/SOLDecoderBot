@@ -1,6 +1,7 @@
-interface ChannelSettings {
+export interface ChannelSettings {
   image: boolean;
-  tag?: { type: 'user' | 'role'; id: string };
+  tag: { type: 'user' | 'role'; id: string } | false;
 }
-type GuildConfig = Record<string, ChannelSettings>;
-type ConfigFile  = Record<string, GuildConfig>;
+
+export type GuildConfig = Record<string, ChannelSettings>;
+export type ConfigFile  = Record<string, GuildConfig>;

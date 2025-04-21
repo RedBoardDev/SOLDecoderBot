@@ -1,13 +1,6 @@
-// src/repositories/channel-repository.ts
+import { ChannelSettings, ConfigFile, GuildConfig } from '@type/channel-settings';
 import fs from 'node:fs';
 import path from 'node:path';
-
-export interface ChannelSettings {
-  image: boolean;
-  tag?: { type: 'user' | 'role'; id: string };
-}
-type GuildConfig = Record<string, ChannelSettings>;
-type ConfigFile  = Record<string, GuildConfig>;
 
 export class ChannelRepository {
   private static instance: ChannelRepository;
@@ -37,13 +30,19 @@ export class ChannelRepository {
   private migrate(raw: any): ConfigFile {
     const out: ConfigFile = {};
     for (const [guildId, cfg] of Object.entries(raw)) {
+      out[guildId] = {};
       if (Array.isArray(cfg)) {
-        out[guildId] = {};
+        // old format
         for (const chanId of cfg) {
-          out[guildId][chanId] = { image: false };
+          out[guildId][chanId] = { image: false, tag: false };
         }
       } else if (typeof cfg === 'object' && cfg !== null) {
-        out[guildId] = cfg as GuildConfig;
+        for (const [chanId, settings] of Object.entries(cfg as GuildConfig)) {
+          out[guildId][chanId] = {
+            image: settings.image ?? false,
+            tag: settings.tag ?? false,
+          };
+        }
       }
     }
     return out;
@@ -62,7 +61,7 @@ export class ChannelRepository {
     channelId: string
   ): ChannelSettings {
     const guild = this.channels[guildId] ?? {};
-    return guild[channelId] ?? { image: false };
+    return guild[channelId] ?? { image: false, tag: false };
   }
 
   public addChannel(
@@ -72,8 +71,8 @@ export class ChannelRepository {
   ): void {
     if (!this.channels[guildId]) this.channels[guildId] = {};
     this.channels[guildId][channelId] = {
-      image: false,
-      ...settings,
+      image: settings.image ?? false,
+      tag: settings.tag ?? false,
     };
     this.save();
   }
@@ -86,7 +85,9 @@ export class ChannelRepository {
     if (!this.channels[guildId]?.[channelId]) {
       this.addChannel(guildId, channelId, settings);
     } else {
-      Object.assign(this.channels[guildId][channelId], settings);
+      const curr = this.channels[guildId][channelId];
+      curr.image = settings.image ?? curr.image;
+      curr.tag   = settings.tag   ?? curr.tag;
       this.save();
     }
   }

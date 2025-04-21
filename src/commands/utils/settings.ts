@@ -1,43 +1,61 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, Role, User, GuildMember, SlashCommandBooleanOption, SlashCommandMentionableOption, SlashCommandOptionsOnlyBuilder } from 'discord.js';
-import type { ChannelSettings } from '@repositories/channel-repository';
+import { ChannelSettings } from '@type/channel-settings';
+import {
+  SlashCommandBuilder,
+  SlashCommandOptionsOnlyBuilder,
+  SlashCommandBooleanOption,
+  SlashCommandStringOption,
+  ChatInputCommandInteraction,
+} from 'discord.js';
 
 /**
- * Ajoute les options communes (image, tag) à un SlashCommandBuilder ou OptionsOnlyBuilder.
+ * Ajoute les options communes (image, tag).
+ * - tag: soit mention, soit 'false'
  */
-export function addSettingsOptions(builder: SlashCommandBuilder): SlashCommandBuilder;
-export function addSettingsOptions(builder: SlashCommandOptionsOnlyBuilder): SlashCommandOptionsOnlyBuilder;
+export function addSettingsOptions(
+  builder: SlashCommandBuilder
+): SlashCommandBuilder;
+export function addSettingsOptions(
+  builder: SlashCommandOptionsOnlyBuilder
+): SlashCommandOptionsOnlyBuilder;
 export function addSettingsOptions(builder: any): any {
   return builder
     .addBooleanOption((opt: SlashCommandBooleanOption) =>
       opt
         .setName('image')
-        .setDescription('Afficher l’attachement comme image dans le pin')
+        .setDescription('Afficher comme embed image')
     )
-    .addMentionableOption((opt: SlashCommandMentionableOption) =>
+    .addStringOption((opt: SlashCommandStringOption) =>
       opt
         .setName('tag')
-        .setDescription('Utilisateur ou rôle à mentionner lors du pin')
+        .setDescription("Mention d'user/role, ou 'false' pour retirer")
     );
 }
 
 /**
- * Extrait les paramètres fournis par l’utilisateur.
+ * Extrait settings de l'interaction.
  */
 export function getSettingsFromInteraction(
   interaction: ChatInputCommandInteraction
 ): Partial<ChannelSettings> {
   const img = interaction.options.getBoolean('image');
-  const tagMe = interaction.options.getMentionable('tag');
+  const tagRaw = interaction.options.getString('tag');
   const settings: Partial<ChannelSettings> = {};
 
   if (img !== null) {
     settings.image = img;
   }
-  if (tagMe) {
-    if (tagMe instanceof Role) {
-      settings.tag = { type: 'role', id: tagMe.id };
-    } else if (tagMe instanceof User || tagMe instanceof GuildMember) {
-      settings.tag = { type: 'user', id: tagMe.id };
+  if (tagRaw !== null) {
+    if (tagRaw.toLowerCase() === 'false') {
+      settings.tag = false;
+    } else {
+      // <@123> ou <@&456>
+      const mUser = tagRaw.match(/^<@!(\d+)>$/) || tagRaw.match(/^<@(\d+)>$/);
+      const mRole = tagRaw.match(/^<@&(\d+)>$/);
+      if (mRole) {
+        settings.tag = { type: 'role', id: mRole[1] };
+      } else if (mUser) {
+        settings.tag = { type: 'user', id: mUser[1] };
+      }
     }
   }
 
@@ -45,7 +63,7 @@ export function getSettingsFromInteraction(
 }
 
 /**
- * Formatte les parties pour le message de confirmation.
+ * Formatte image & tag pour affichage.
  */
 export function formatSettingsParts(
   settings: Partial<ChannelSettings>
@@ -54,12 +72,16 @@ export function formatSettingsParts(
   if ('image' in settings) {
     parts.push(`Image : ${settings.image}`);
   }
-  if (settings.tag) {
-    const mention =
-      settings.tag.type === 'role'
-        ? `<@&${settings.tag.id}>`
-        : `<@${settings.tag.id}>`;
-    parts.push(`Tag : ${mention}`);
+  if ('tag' in settings) {
+    parts.push(
+      settings.tag
+        ? `Tag : ${
+            settings.tag.type === 'role'
+              ? `<@&${settings.tag.id}>`
+              : `<@${settings.tag.id}>`
+          }`
+        : 'Tag : false'
+    );
   }
   return parts;
 }

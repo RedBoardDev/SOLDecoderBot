@@ -1,6 +1,7 @@
-import { ChannelRepository, ChannelSettings } from '@repositories/channel-repository';
+import { ChannelRepository } from '@repositories/channel-repository';
 import type { GuildMember, TextChannel, Message, TextBasedChannel } from 'discord.js';
 import { MessageProcessor } from './message-processor';
+import { ChannelSettings } from '@type/channel-settings';
 
 export class ChannelService {
   private repo = ChannelRepository.getInstance();
