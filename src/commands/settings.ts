@@ -9,11 +9,11 @@ import {
 
 const service = new ChannelService();
 
-export const monitor: Command = {
+export const settings: Command = {
   data: addSettingsOptions(
     new SlashCommandBuilder()
-      .setName('monitor')
-      .setDescription('Ajoute ce salon à la liste des canaux surveillés')
+      .setName('settings')
+      .setDescription('Configure this channel’s pin settings')
   ),
   async execute(interaction: ChatInputCommandInteraction) {
     const guildId = interaction.guildId;
@@ -26,17 +26,20 @@ export const monitor: Command = {
       return;
     }
 
-    const settings = getSettingsFromInteraction(interaction);
-    service.addChannel(guildId, channelId, settings);
+    const update = getSettingsFromInteraction(interaction);
+    if (Object.keys(update).length === 0) {
+      await interaction.reply({
+        content: 'Vous devez préciser `image` et/ou `tag`.',
+        ephemeral: true,
+      });
+      return;
+    }
 
-    const base = `Le salon <#${channelId}> a été ajouté à la liste des canaux surveillés.`;
-    const parts = formatSettingsParts(settings);
+    service.updateSettings(guildId, channelId, update);
+    const parts = formatSettingsParts(update);
 
     await interaction.reply({
-      content:
-        parts.length > 0
-          ? `${base}\n• ${parts.join('\n• ')}`
-          : base,
+      content: `⚙️ Paramètres mis à jour pour ce salon :\n• ${parts.join('\n• ')}`,
       ephemeral: true,
     });
   },

@@ -1,24 +1,35 @@
-import { ChannelRepository } from '@repositories/channel-repository';
+import { ChannelRepository, ChannelSettings } from '@repositories/channel-repository';
 import type { GuildMember, TextChannel, Message, TextBasedChannel } from 'discord.js';
 import { MessageProcessor } from './message-processor';
 
 export class ChannelService {
-  private readonly repository: ChannelRepository;
+  private repo = ChannelRepository.getInstance();
 
-  constructor() {
-    this.repository = ChannelRepository.getInstance();
-  }
-
-  public addChannel(guildId: string, channelId: string): void {
-    this.repository.addChannel(guildId, channelId);
-  }
-
-  public removeChannel(guildId: string, channelId: string): void {
-    this.repository.removeChannel(guildId, channelId);
+  public addChannel(guildId: string, channelId: string, settings?: Partial<ChannelSettings>) {
+    this.repo.addChannel(guildId, channelId, settings);
   }
 
   public getMonitoredChannels(guildId: string): string[] {
-    return this.repository.getMonitoredChannels(guildId);
+    return this.repo.getMonitoredChannels(guildId);
+  }
+
+  public getChannelSettings(
+    guildId: string,
+    channelId: string
+  ): ChannelSettings {
+    return this.repo.getChannelSettings(guildId, channelId);
+  }
+
+  public updateSettings(
+    guildId: string,
+    channelId: string,
+    settings: Partial<ChannelSettings>
+  ): void {
+    this.repo.updateChannelSettings(guildId, channelId, settings);
+  }
+
+  public removeChannel(guildId: string, channelId: string): void {
+    this.repo.removeChannel(guildId, channelId);
   }
 
   public async fetchChannelWithPermissions(

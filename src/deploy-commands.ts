@@ -6,10 +6,11 @@ import { unmonitor } from '@commands/unmonitor';
 import { help } from '@commands/help';
 import { REST, Routes } from 'discord.js';
 import { config } from 'dotenv';
+import { settings } from '@commands/settings';
 
 config();
 
-const commands = [monitor, unmonitor, scan, clear, monitored, help].map((command) => command.data.toJSON());
+const commands = [monitor, unmonitor, scan, clear, monitored, help, settings].map((command) => command.data.toJSON());
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN ?? '');
 
 (async (): Promise<void> => {
