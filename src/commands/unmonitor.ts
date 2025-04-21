@@ -7,7 +7,7 @@ const service = new ChannelService();
 export const unmonitor: Command = {
   data: new SlashCommandBuilder()
     .setName('unmonitor')
-    .setDescription('Removes the current channel from the monitored list'),
+    .setDescription('Stop monitoring this channel and remove its configuration'),
   async execute(interaction: CommandInteraction): Promise<void> {
     if (!interaction.guildId || !interaction.channelId) {
       await interaction.reply({ content: 'This command must be used in a server channel.', ephemeral: true });

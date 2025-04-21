@@ -12,7 +12,7 @@ const service = new ChannelService();
 export const monitored: Command = {
   data: new SlashCommandBuilder()
     .setName('monitored')
-    .setDescription('Liste les salons surveillés et leurs paramètres'),
+    .setDescription('List all monitored channels along with their current settings'),
   async execute(interaction: ChatInputCommandInteraction) {
     const guildId = interaction.guildId;
     if (!guildId) {

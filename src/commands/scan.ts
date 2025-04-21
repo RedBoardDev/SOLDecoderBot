@@ -8,7 +8,7 @@ const MAX_MESSAGES = 10_000;
 export const scan: Command = {
   data: new SlashCommandBuilder()
     .setName('scan')
-    .setDescription('Loads and processes up to 10,000 existing messages in the current channel'),
+    .setDescription('Fetch up to 10,000 past messages and process attachments for pinning'),
   async execute(interaction: CommandInteraction): Promise<void> {
     if (!interaction.guildId || !interaction.guild || !interaction.channelId) {
       await interaction.reply({ content: 'This command must be used in a server channel.', ephemeral: true });

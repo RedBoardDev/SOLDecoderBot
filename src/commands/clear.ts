@@ -8,7 +8,7 @@ const MAX_MESSAGES = 10_000;
 export const clear: Command = {
   data: new SlashCommandBuilder()
     .setName('clear')
-    .setDescription('Unpins messages and deletes bot messages in the current channel'),
+    .setDescription('Unpin up to 10,000 messages and delete bot posts in this channel'),
   async execute(interaction: CommandInteraction): Promise<void> {
     if (!interaction.guildId || !interaction.guild || !interaction.channelId) {
       await interaction.reply({ content: 'This command must be used in a server channel.', ephemeral: true });

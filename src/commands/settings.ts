@@ -13,7 +13,7 @@ export const settings: Command = {
   data: addSettingsOptions(
     new SlashCommandBuilder()
       .setName('settings')
-      .setDescription('Configure ce salon : image + tag')
+      .setDescription('Configure pin behavior: image embedding and mention tagging')
   ),
   async execute(interaction: ChatInputCommandInteraction) {
     const guildId   = interaction.guildId!;

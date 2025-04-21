@@ -1,24 +1,23 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, type ChatInputCommandInteraction } from 'discord.js';
 import type { Command } from '@type/command';
 
 export const help: Command = {
   data: new SlashCommandBuilder()
     .setName('help')
-    .setDescription('Displays the list of available commands and their descriptions'),
-  async execute(interaction) {
+    .setDescription('Show all available commands with their descriptions'),
+  async execute(interaction: ChatInputCommandInteraction) {
+    const client = interaction.client as unknown as { commands: Map<string, Command> };
     const embed = new EmbedBuilder()
       .setTitle('Bot Command Help')
-      .setDescription('Here are the commands you can use with this bot:')
-      .addFields(
-        { name: '/monitor', value: 'Adds the current channel to the list of monitored channels.' },
-        { name: '/unmonitor', value: 'Removes the current channel from the list of monitored channels.' },
-        { name: '/scan', value: 'Loads and processes up to 10,000 existing messages in monitored channels.' },
-        { name: '/clear', value: 'Unpins up to 10,000 messages in monitored channels.' },
-        { name: '/monitored', value: 'Lists all monitored channels in the server.' },
-      )
-      .setFooter({
-        text: 'All commands are slash commands. Use / followed by the command name to execute them.',
-      });
+      .setDescription('Voici la liste des commandes disponibles :');
+
+    const fields = Array.from(client.commands.values()).map(cmd => {
+      const name = cmd.data.toJSON().name;
+      const description = cmd.data.toJSON().description;
+      return { name: `/${name}`, value: description, inline: false };
+    });
+
+    embed.addFields(fields);
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
   },

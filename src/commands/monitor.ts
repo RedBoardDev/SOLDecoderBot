@@ -13,7 +13,7 @@ export const monitor: Command = {
   data: addSettingsOptions(
     new SlashCommandBuilder()
       .setName('monitor')
-      .setDescription('Ajoute ce salon à la liste des canaux surveillés')
+      .setDescription('Start monitoring this channel for attachments with optional image/embed and tagging')
   ),
   async execute(interaction: ChatInputCommandInteraction) {
     const guildId = interaction.guildId;
