@@ -27,29 +27,41 @@ It also supports **scheduled PnL summaries for any Solana wallet**.
 
 ---
 
-## 📂 Project Layout (suggested)
+## 🏛 Architecture Overview
 
-```
+```bash
 src/
- ├─ commands/
- │   ├─ follow.ts        # /follow & /unfollow
- │   ├─ watch.ts         # /watch & /unwatch
- │   ├─ watchers.ts      # /watchers dashboard
- │   └─ follows.ts       # /follows  dashboard
- ├─ listeners/
- │   └─ closedMessage.ts # 🟨Closed detector → API caller
- ├─ components/
- │   ├─ modals/
- │   ├─ buttons/
- │   └─ menus/
- ├─ dynamo/
- │   └─ client.ts
- ├─ scheduler/
- │   └─ walletSummary.ts # Lambda handler
- └─ utils/
-     ├─ metlexMapper.ts
-     └─ canvas.ts        # (optional)
+├─ domain/
+│  ├─ entities/            # Business models (Watcher, Wallet)
+│  ├─ value-objects/       # Typed primitives (Threshold, Frequency)
+│  ├─ interfaces/          # Port definitions (IWatcherRepo, ILpAgentClient, …)
+│  └─ errors/              # Domain-specific exceptions
+│
+├─ application/
+│  ├─ use-cases/           # Orchestrators (AddWatcher, ProcessClosedMessage, …)
+│  ├─ dtos/                # Zod-validated inputs/outputs
+│  └─ errors/              # Use-case failures
+│
+├─ infrastructure/
+│  ├─ repositories/        # DynamoDB implementations
+│  ├─ services/            # Discord adapter, Metlex mapper, HTTP client, Canvas
+│  └─ config/              # Env & AWS setup
+│
+├─ presentation/
+│  ├─ commands/            # Slash commands (follow, watchers, watch, follows, clear)
+│  ├─ listeners/           # Event handlers (closed-message)
+│  ├─ components/          # Modals, buttons, select-menus
+│  └─ utils/               # Embed builders, interaction collectors
+│
+├─ schemas/                # Zod schemas for API responses & command options
+├─ shared/                 # Logger & global error handler
+└─ injection/              # DI container bindings
 ```
+
+* **Clean Architecture** separates “what” (domain) from “how” (infrastructure).
+* **Zod** enforces strict typing at boundaries (DTOs & external APIs).
+* **DI Container** (e.g. tsyringe) wires services, repos, and use-cases for easy testing.
+* **kebab-case** file naming + TypeScript `strict` + ESLint/Prettier ensure a professional, maintainable codebase.
 
 ---
 
@@ -141,22 +153,22 @@ sequenceDiagram
 ## 🚀 Setup & Development
 
 ```bash
-pnpm install
+npm install
 cp .env.example .env        # add Discord token, AWS creds
-pnpm dev                    # ts-node watch (local)
+npm run dev                    # ts-node watch (local)
 ```
 
 ### Register Commands
 
 ```bash
-pnpm register:commands       # pushes global commands via REST
+npm run register:commands       # pushes global commands via REST
 ```
 
 ### Lint & Build
 
 ```bash
-pnpm lint
-pnpm build                   # tsc -> dist/
+npm run check:all
+npm run build                   # tsc -> dist/
 ```
 
 ---
