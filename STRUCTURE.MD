@@ -148,7 +148,3 @@ src/
   * Unit tests for each use case & service (Jest + ts-jest).
   * Interface mocks to isolate the business layer.
 * **Lint & format**: ESLint + Prettier with Airbnb rules adapted for TypeScript.
-
----
-
-If you want, I can also provide an English diagram or visual representation of this architecture to make it clearer. Want me to?
