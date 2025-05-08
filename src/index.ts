@@ -10,6 +10,7 @@ import { unwatchCommand } from './presentation/commands/unwatch.command';
 import { registerWatchersInteractionHandlers } from './presentation/listeners/watchers.interaction.listener';
 import { registerClosedMessageListener } from './presentation/listeners/closed-message.listener';
 import { cardCommand } from './presentation/commands/card.command';
+import { scanCommand } from './presentation/commands/scan.command';
 
 async function startBot(): Promise<void> {
   logger.info('Initializing Metlex Watcher Bot');
@@ -25,6 +26,7 @@ async function startBot(): Promise<void> {
     unwatchCommand.data.toJSON(),
     watchersCommand.data.toJSON(),
     cardCommand.data.toJSON(),
+    scanCommand.data.toJSON(),
   ];
 
   client.once('ready', async () => {
@@ -48,6 +50,7 @@ async function startBot(): Promise<void> {
       [unwatchCommand.data.name]: unwatchCommand,
       [watchersCommand.data.name]: watchersCommand,
       [cardCommand.data.name]: cardCommand,
+      [scanCommand.data.name]: scanCommand,
     };
 
     const command = commands[commandName];
