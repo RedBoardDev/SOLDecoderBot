@@ -1,6 +1,7 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import type { PositionResponse } from '../../schemas/position-response.schema';
 import type { TakeProfitTrigger } from '../../schemas/takeprofit-message.schema';
+import { selectBackground } from './select-background-image';
 
 /**
  * Builds a standard short text summary:
@@ -72,7 +73,7 @@ export async function buildPositionImage(response: PositionResponse): Promise<Bu
   const ctx = canvas.getContext('2d');
 
   // Draw background
-  const bg = await loadImage('assets/background3.png');
+  const bg = await loadImage(selectBackground(pct));
   ctx.drawImage(bg, 0, 0, width, height);
 
   const x = width - margin;
