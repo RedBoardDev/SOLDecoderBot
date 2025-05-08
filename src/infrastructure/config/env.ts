@@ -28,4 +28,6 @@ export const config = {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
   },
+  solanaRpcEndpoint: process.env.SOLANA_RPC_ENDPOINT ?? 'https://api.mainnet-beta.solana.com',
+  meteoraProgramId: process.env.METEORA_PROGRAM_ID ?? '',
 };

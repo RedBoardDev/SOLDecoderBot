@@ -100,7 +100,7 @@ GSIs
 
 ### Watchers (`/watchers`)
 
-```
+```text
 ╭─ Watchers (3)
 │ • #house-trades   ±5 % | img:❌ | pin:✅ | tag:@Traders
 │ • #alpha-drops    ±3 % | img:✅ | pin:❌ | tag:none
@@ -112,7 +112,7 @@ Buttons: **Add Watcher**, **Edit**, **Disable**, **Remove**
 
 ### Wallets (`/follows`)
 
-```
+```text
 ╭─ Wallets (3)
 │ • Dx8…Yp   #gains   DAY
 │ • 9hQ…Sd   #gains   WEEK
@@ -173,21 +173,10 @@ npm run build                   # tsc -> dist/
 
 ---
 
-## 🛣️ Roadmap
-
-1. **MVP**: `/follow`, `/unfollow`, Closed‑listener → Embed reply.
-2. Dashboards `/watchers`, `/follows` (embeds, buttons, modals).
-3. Image rendering option (`image=true`).
-4. Wallet scheduler (EventBridge + Lambda).
-5. Pagination for >25 watchers/wallets.
-6. Optional web dashboard / metrics.
-
----
-
 ## 🤝 Contributing
 
 1. Fork & create a feature branch.
-2. Follow eslint rules (`pnpm lint --fix`).
+2. Follow eslint rules (`npm run check:all`).
 3. Submit a pull request with a clear description.
 
 ---
