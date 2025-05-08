@@ -6,9 +6,9 @@ import type { PositionResponse } from '../../schemas/position-response.schema';
 import { buildPositionImage, buildPositionMessage, buildTriggeredMessage } from '../utils/position-ui';
 import { logger } from '../../shared/logger';
 import type { Watcher, WatcherProps } from '../../domain/entities/watcher';
-import { TakeProfitTriggerSchema } from '../../schemas/takeprofit-message.schema';
 import { safePin } from '../utils/safe-pin';
 import { fetchPositionData } from './closed-message.fetch';
+import { type TakeProfitTrigger, TakeProfitTriggerSchema } from '../../schemas/takeprofit-message.schema';
 
 const watcherRepo = new DynamoWatcherRepository(docClient);
 
@@ -83,9 +83,16 @@ export async function replyWithPosition(
   }
 
   let contentBody: string;
+  let triggerData: TakeProfitTrigger | null = null;
+
   if (previousMessage) {
     const parsed = TakeProfitTriggerSchema.safeParse(previousMessage.content);
-    contentBody = parsed.success ? buildTriggeredMessage(response, parsed.data) : buildPositionMessage(response);
+    if (parsed.success) {
+      triggerData = parsed.data;
+      contentBody = buildTriggeredMessage(response, triggerData);
+    } else {
+      contentBody = buildPositionMessage(response);
+    }
   } else {
     contentBody = buildPositionMessage(response);
   }
@@ -93,7 +100,12 @@ export async function replyWithPosition(
   const content = mention + contentBody;
 
   const files = watcher.image
-    ? [{ attachment: await buildPositionImage(response), name: `${response.data.position}.png` }]
+    ? [
+        {
+          attachment: await buildPositionImage(response, !!triggerData),
+          name: `${response.data.position}.png`,
+        },
+      ]
     : undefined;
 
   const sent = await channel.send({

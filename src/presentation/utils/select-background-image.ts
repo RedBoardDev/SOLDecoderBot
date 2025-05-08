@@ -12,11 +12,15 @@ function getBackgroundPath(fileName: string): string {
 }
 
 function shouldUseTrumpBackground(): boolean {
-  const TRUMP_CHANCE = 0.05;
+  const TRUMP_CHANCE = 0.1;
   return Math.random() < TRUMP_CHANCE;
 }
 
-export function selectBackground(pct: number): string {
+export function selectBackground(pct: number, triggerTakeProfit: boolean): string {
+  if (triggerTakeProfit === true) {
+    return getBackgroundPath(Background.Happy);
+  }
+
   if (pct === 0) {
     return getBackgroundPath(Background.Default);
   }
@@ -28,10 +32,6 @@ export function selectBackground(pct: number): string {
 
   if (pct < 0) {
     return getBackgroundPath(Background.Sad);
-  }
-
-  if (pct > 50) {
-    return getBackgroundPath(Background.Happy);
   }
 
   return getBackgroundPath(Background.Default);

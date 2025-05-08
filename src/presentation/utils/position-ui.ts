@@ -36,7 +36,7 @@ export function buildTriggeredMessage(response: PositionResponse, trigger: TakeP
 /**
  * Renders a simple PNG summarizing PnL and % change.
  */
-export async function buildPositionImage(response: PositionResponse): Promise<Buffer> {
+export async function buildPositionImage(response: PositionResponse, triggerTakeProfit: boolean): Promise<Buffer> {
   const { pnl, ageHour, token0Info, token1Info, valueNative } = response.data;
 
   const pairLeft = token0Info.token_symbol;
@@ -73,7 +73,7 @@ export async function buildPositionImage(response: PositionResponse): Promise<Bu
   const ctx = canvas.getContext('2d');
 
   // Draw background
-  const bg = await loadImage(selectBackground(pct));
+  const bg = await loadImage(selectBackground(pct, triggerTakeProfit));
   ctx.drawImage(bg, 0, 0, width, height);
 
   const x = width - margin;
