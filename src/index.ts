@@ -8,6 +8,8 @@ import { watchersCommand } from './presentation/commands/watchers.command';
 import { watchCommand } from './presentation/commands/watch.command';
 import { unwatchCommand } from './presentation/commands/unwatch.command';
 import { registerWatchersInteractionHandlers } from './presentation/listeners/watchers.interaction.listener';
+import { registerClosedMessageListener } from './presentation/listeners/closed-message.listener';
+import { cardCommand } from './presentation/commands/card.command';
 
 async function startBot(): Promise<void> {
   logger.info('Initializing Metlex Watcher Bot');
@@ -18,7 +20,12 @@ async function startBot(): Promise<void> {
   });
 
   const rest = new REST({ version: '10' }).setToken(config.discordToken);
-  const commandsPayload = [watchCommand.data.toJSON(), unwatchCommand.data.toJSON(), watchersCommand.data.toJSON()];
+  const commandsPayload = [
+    watchCommand.data.toJSON(),
+    unwatchCommand.data.toJSON(),
+    watchersCommand.data.toJSON(),
+    cardCommand.data.toJSON(),
+  ];
 
   client.once('ready', async () => {
     logger.info(`Logged in as ${client.user?.tag}`);
@@ -40,6 +47,7 @@ async function startBot(): Promise<void> {
       [watchCommand.data.name]: watchCommand,
       [unwatchCommand.data.name]: unwatchCommand,
       [watchersCommand.data.name]: watchersCommand,
+      [cardCommand.data.name]: cardCommand,
     };
 
     const command = commands[commandName];
@@ -52,6 +60,9 @@ async function startBot(): Promise<void> {
 
   // register events
   registerWatchersInteractionHandlers(client);
+
+  // register listeners
+  registerClosedMessageListener(client);
 
   client.on('error', (error) => {
     logger.error('Discord client error', error);
