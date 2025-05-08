@@ -68,8 +68,7 @@ src/
 │
 ├─ schemas/
 │   ├─ metlex-link.schema.ts
-│   ├─ position-response.schema.ts
-│   └─ command-options.schema.ts
+│   └─ position-response.schema.ts
 │
 ├─ shared/
 │   ├─ logger.ts
