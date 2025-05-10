@@ -1,8 +1,8 @@
 import { SlashCommandBuilder, type ChatInputCommandInteraction, PermissionFlagsBits, MessageFlags } from 'discord.js';
 import { UserError } from '../../application/errors/application-errors';
-import { fetchPositionData } from '../listeners/closed-message.fetch';
 import { buildPositionImage } from '../utils/position-ui';
 import { logger } from '../../shared/logger';
+import { PositionFetcher } from '../../infrastructure/services/position-fetcher';
 
 export const cardCommand = {
   data: new SlashCommandBuilder()
@@ -21,7 +21,9 @@ export const cardCommand = {
         throw new UserError('Hash invalide : seul alphanumérique et tirets autorisés.');
       }
 
-      const position = await fetchPositionData(hash);
+      const fetcher = PositionFetcher.getInstance();
+      const position = await fetcher.fetchPosition(hash);
+
       const image = await buildPositionImage(position, false);
 
       await interaction.editReply({

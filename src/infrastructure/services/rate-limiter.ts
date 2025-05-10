@@ -11,7 +11,7 @@ export class RateLimiter {
 
   public static getInstance(): RateLimiter {
     if (!RateLimiter.instance) {
-      RateLimiter.instance = new RateLimiter(1000);
+      RateLimiter.instance = new RateLimiter(500);
     }
     return RateLimiter.instance;
   }

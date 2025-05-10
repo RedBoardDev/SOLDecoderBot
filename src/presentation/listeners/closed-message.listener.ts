@@ -1,14 +1,15 @@
 import { type Client, type Message, ChannelType, type TextChannel } from 'discord.js';
 import { DynamoWatcherRepository } from '../../infrastructure/repositories/dynamo-watcher-repository';
 import { docClient } from '../../infrastructure/config/aws';
-import { MetlexLinkSchema, type MetlexLink } from '../../schemas/metlex-link.schema';
+import { type MetlexLinks, MetlexLinksSchema } from '../../schemas/metlex-link.schema';
 import type { PositionResponse } from '../../schemas/position-response.schema';
 import { buildPositionImage, buildPositionMessage, buildTriggeredMessage } from '../utils/position-ui';
 import { logger } from '../../shared/logger';
 import type { Watcher, WatcherProps } from '../../domain/entities/watcher';
 import { safePin } from '../utils/safe-pin';
-import { fetchPositionData } from './closed-message.fetch';
 import { type TakeProfitTrigger, TakeProfitTriggerSchema } from '../../schemas/takeprofit-message.schema';
+import { PositionFetcher } from '../../infrastructure/services/position-fetcher';
+import { aggregatePositions } from '../utils/aggregate-positions';
 
 const watcherRepo = new DynamoWatcherRepository(docClient);
 
@@ -20,16 +21,20 @@ async function onMessageCreate(message: Message) {
   try {
     if (!message.guildId || !isCandidateMessage(message)) return;
 
-    const metlex = extractMetlexLink(message.content);
-    if (!metlex) return;
+    const metlexLinks = extractMetlexLinks(message.content);
+    if (!metlexLinks) return;
 
     const watcher = await fetchWatcherConfig(message.guildId, message.channelId);
     if (!watcher) return;
 
-    const position = await fetchPositionData(metlex.hash);
+    const fetcher = PositionFetcher.getInstance();
+    const positions = await fetcher.fetchPositions(metlexLinks);
+
+    const aggregated = aggregatePositions(positions);
 
     const previousMessage = await getPreviousMessage(message);
-    await replyWithPosition(message, previousMessage, watcher, position);
+
+    await replyWithPosition(message, previousMessage, watcher, aggregated);
   } catch (err) {
     logger.error('closed-message listener failed', err instanceof Error ? err : new Error(String(err)));
   }
@@ -46,8 +51,8 @@ export function isCandidateMessage(message: Message): boolean {
   );
 }
 
-export function extractMetlexLink(content: string): MetlexLink | null {
-  const result = MetlexLinkSchema.safeParse(content);
+export function extractMetlexLinks(content: string): MetlexLinks | null {
+  const result = MetlexLinksSchema.safeParse(content);
   return result.success ? result.data : null;
 }
 
