@@ -1,4 +1,4 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';
 import type { PositionResponse } from '../../schemas/position-response.schema';
 import type { TakeProfitTrigger } from '../../schemas/takeprofit-message.schema';
 import { selectBackground } from './select-background-image';
@@ -32,6 +32,8 @@ export function buildTriggeredMessage(response: PositionResponse, trigger: TakeP
   const solLabel = `(${sol >= 0 ? '' : ''}${sol.toFixed(2)} SOL)`;
   return `${icon} Take profit triggered: ${label} ${solLabel}`;
 }
+
+GlobalFonts.registerFromPath('assets/fonts/VarelaRound-Regular.ttf', 'Varela Round');
 
 /**
  * Renders a simple PNG summarizing PnL and % change.
@@ -87,7 +89,7 @@ export async function buildPositionImage(response: PositionResponse, triggerTake
 
   // --- 1) Pair with colored slash ---
   // Measure parts
-  ctx.font = 'bold 72px Sans';
+  ctx.font = 'bold 72px "Varela Round"';
   const wLeft = ctx.measureText(pairLeft).width;
   const wSlash = ctx.measureText('/').width;
   const wRight = ctx.measureText(pairRight).width;
@@ -111,7 +113,7 @@ export async function buildPositionImage(response: PositionResponse, triggerTake
   ctx.fillText(pairRight, startXPair + wLeft + wSlash, topY);
 
   // --- 2) Profit line (pastel green + near-white) ---
-  ctx.font = 'bold 72px Sans';
+  ctx.font = 'bold 72px "Varela Round"';
   // USD part
   const wUsd = ctx.measureText(profitUsdText).width;
   ctx.textAlign = 'left';
@@ -124,7 +126,7 @@ export async function buildPositionImage(response: PositionResponse, triggerTake
   ctx.fillText(profitSolText, x - ctx.measureText(profitSolText).width, topY + lineGap);
 
   // --- 3) Elapsed time (mixed colors) ---
-  ctx.font = 'bold 48px Sans';
+  ctx.font = 'bold 48px "Varela Round"';
   const wNum1 = ctx.measureText(elapsedNum1).width;
   const wUnit1 = ctx.measureText(elapsedUnit1).width;
   const wNum2 = ctx.measureText(elapsedNum2).width;
@@ -155,7 +157,7 @@ export async function buildPositionImage(response: PositionResponse, triggerTake
 
   // --- Bottom metrics (uniform size 48px) ---
   const bottomY = height - margin - lineGap;
-  ctx.font = 'bold 48px Sans';
+  ctx.font = 'bold 48px "Varela Round"';
 
   // PNL label
   const pnlLabel = 'PNL: ';
