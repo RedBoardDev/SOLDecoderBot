@@ -4,23 +4,24 @@ import { z } from 'zod';
  * Minimal schema: only the fields we need for text/image messages.
  */
 export const PositionResponseSchema = z.object({
-  status: z.string(),
+  status: z.string(), // e.g. "success"
   data: z.object({
-    tokenId: z.string(),
-    pairName: z.string(),
+    tokenId: z.string(), // e.g. "3iCfTA…KgFhBC"
+    pairName: z.string(), // e.g. "SOL/USDC"
     pnl: z.object({
+      value: z.number(), // change in USD
       valueNative: z.number(), // change in SOL
       percentNative: z.number(), // change in native %
     }),
     ageHour: z.string(), // duration in hours, e.g. "1.75"
-    closeAt: z.string(), // ISO timestamp
     position: z.string(), // position ID
-    valueNative: z.number(), // added field
+    value: z.number(), // TVL in USD
+    valueNative: z.number(), // TVL in SOL
     token0Info: z.object({
-      token_symbol: z.string(), // added field
+      token_symbol: z.string(), // e.g. "SOL"
     }),
     token1Info: z.object({
-      token_symbol: z.string(), // added field
+      token_symbol: z.string(), // e.g. "USDC"
     }),
   }),
 });

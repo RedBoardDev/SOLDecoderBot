@@ -22,7 +22,7 @@ export const cardCommand = {
       }
 
       const position = await fetchPositionData(hash);
-      const image = await buildPositionImage(position);
+      const image = await buildPositionImage(position, false);
 
       await interaction.editReply({
         files: [{ attachment: image, name: `position-${position.data.tokenId}.png` }],

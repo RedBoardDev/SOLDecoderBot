@@ -37,16 +37,13 @@ export function buildTriggeredMessage(response: PositionResponse, trigger: TakeP
  * Renders a simple PNG summarizing PnL and % change.
  */
 export async function buildPositionImage(response: PositionResponse, triggerTakeProfit: boolean): Promise<Buffer> {
-  const { pnl, ageHour, token0Info, token1Info, valueNative } = response.data;
+  const { pnl, ageHour, token0Info, token1Info, value: tvlUSD, valueNative: tvlSOL } = response.data;
 
   const pairLeft = token0Info.token_symbol;
   const pairRight = token1Info.token_symbol;
 
   const pnlSOL = pnl.valueNative;
-  const pnlUSD = pnl.valueNative * 100; // TODO: placeholder conversion
-
-  const tvlSOL = valueNative;
-  const tvlUSD = valueNative * 100; // TODO: placeholder conversion
+  const pnlUSD = pnl.value;
 
   const elapsedHours = Number.parseFloat(ageHour);
   const h = Math.floor(elapsedHours);
