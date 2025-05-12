@@ -1,85 +1,86 @@
-import { monitor } from '@commands/monitor';
-import { monitored } from '@commands/monitored';
-import { scan } from '@commands/scan';
-import { clear } from '@commands/clear';
-import { unmonitor } from '@commands/unmonitor';
-import { help } from '@commands/help';
-import { settings } from '@commands/settings';
-import { messageCreate } from '@events/message-create';
-import type { Command } from '@type/command';
-import { Client, Collection, GatewayIntentBits, type ChatInputCommandInteraction } from 'discord.js';
-import { config } from 'dotenv';
-import { logger, LogLevel } from './utils/logger';
-import { handleCommandError } from './utils/error-handler';
-import { requireAdmin } from './utils/command-guards';
+import { Client, GatewayIntentBits, MessageFlags } from 'discord.js';
+import { REST } from '@discordjs/rest';
+import { Routes } from 'discord-api-types/v10';
+import { config } from './infrastructure/config/env';
+import { logger } from './shared/logger';
+import { setupErrorHandler } from './shared/error-handler';
+import { registerWatchersInteractionHandlers } from './presentation/listeners/watchers-interaction';
+import { watchersCommand } from './presentation/commands/watchers.command';
+import { registerWalletDetailInteractionHandlers } from './presentation/listeners/watchers-interaction/wallet-settings';
+import { registerClosedMessageListener } from './presentation/listeners/closed-message.listener';
 
-config();
+async function startBot(): Promise<void> {
+  logger.info('Initializing Metlex Watcher Bot');
+  setupErrorHandler();
 
-const isProduction = process.env.NODE_ENV === 'production';
-logger.setLevel(isProduction ? LogLevel.INFO : LogLevel.DEBUG);
+  const client = new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+  });
 
-logger.info('Bot starting up', {
-  environment: isProduction ? 'production' : 'development',
-  nodeVersion: process.version,
-  platform: process.platform,
-});
+  const rest = new REST({ version: '10' }).setToken(config.discordToken);
+  const commandsPayload = [watchersCommand.data.toJSON()];
 
-const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
-});
+  client.once('ready', async () => {
+    logger.info(`Logged in as ${client.user?.tag}`);
 
-declare module 'discord.js' {
-  interface Client {
-    commands: Collection<string, Command>;
-  }
-}
+    try {
+      await rest.put(Routes.applicationCommands(client.user!.id), { body: commandsPayload });
+      logger.info('✅ Registered slash commands');
+    } catch (err: unknown) {
+      logger.error('Failed to register slash commands', err instanceof Error ? err : new Error(String(err)));
+    }
+  });
 
-client.commands = new Collection<string, Command>();
-const commands: Command[] = [monitor, unmonitor, scan, clear, monitored, help, settings];
-for (const command of commands) {
-  client.commands.set(command.data.name, command);
-}
+  client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
 
-client.once('ready', () => {
-  logger.info(`Bot is ready! Logged in as ${client.user?.tag}`);
-});
+    const { commandName } = interaction;
 
-client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
+    const commands: Record<string, typeof watchersCommand> = {
+      [watchersCommand.data.name]: watchersCommand,
+    };
 
-  const command = client.commands.get(interaction.commandName);
-  if (!command) return;
+    const command = commands[commandName];
+    if (command) {
+      await command.execute(interaction);
+    } else {
+      await interaction.reply({ content: 'Unknown command', flags: MessageFlags.Ephemeral });
+    }
+  });
+
+  // register events
+  registerWatchersInteractionHandlers(client);
+  registerWalletDetailInteractionHandlers(client);
+  registerClosedMessageListener(client);
+
+  client.on('error', (error) => {
+    logger.error('Discord client error', error);
+  });
 
   try {
-    requireAdmin(interaction);
-
-    logger.debug('Executing command', {
-      command: interaction.commandName,
-      user: interaction.user.tag,
-      channelId: interaction.channelId,
-    });
-
-    await command.execute(interaction as ChatInputCommandInteraction);
-  } catch (error) {
-    await handleCommandError(error, interaction as ChatInputCommandInteraction);
-  }
-});
-
-client.on('messageCreate', messageCreate);
-
-process.on('unhandledRejection', (error) => {
-  logger.error('Unhandled promise rejection', error as Error);
-});
-
-process.on('uncaughtException', (error) => {
-  logger.fatal('Uncaught exception', error);
-  if (isProduction) {
-    client.destroy();
+    await client.login(config.discordToken);
+  } catch (err: unknown) {
+    logger.fatal('Failed to login to Discord', err instanceof Error ? err : new Error(String(err)));
     process.exit(1);
   }
-});
 
-client.login(process.env.DISCORD_TOKEN).catch((error) => {
-  logger.fatal('Failed to login to Discord', error as Error);
+  const shutdown = async (): Promise<void> => {
+    logger.info('Graceful shutdown initiated');
+    try {
+      await client.destroy();
+      logger.info('Discord client destroyed');
+    } catch (err: unknown) {
+      logger.error('Error during shutdown', err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      process.exit(0);
+    }
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
+
+startBot().catch((err: unknown) => {
+  logger.fatal('Bot startup failed', err instanceof Error ? err : new Error(String(err)));
   process.exit(1);
 });

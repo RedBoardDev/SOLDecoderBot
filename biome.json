@@ -40,9 +40,7 @@
         "noAccumulatingSpread": "info"
       },
       "complexity": {
-        "noForEach": "info",
-        "noThisInStatic": "off",
-        "noStaticOnlyClass": "off"
+        "noForEach": "info"
       },
       "style": {
         "noNonNullAssertion": "warn",

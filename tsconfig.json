@@ -1,20 +1,22 @@
 {
   "compilerOptions": {
-    "target": "es6",
-    "module": "commonjs",
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022"],
+    "rootDir": "archives2/src",
+    "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
-    "outDir": "dist",
-    "rootDir": "src",
-    "baseUrl": "./src",
-    "paths": {
-      "@type/*": ["types/*"],
-      "@commands/*": ["commands/*"],
-      "@events/*": ["events/*"],
-      "@services/*": ["services/*"],
-      "@repositories/*": ["repositories/*"],
-    }
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false
   },
-  "include": ["src/**/*"],
+  "include": ["archives2/src"],
   "exclude": ["node_modules", "dist"]
 }
