@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-
 export const MetlexLinkSchema = z.object({
   url: z.string().url(),
   hash: z.string(),

@@ -1,17 +1,14 @@
-import { type Client, type Message, ChannelType, type TextChannel } from 'discord.js';
-import { DynamoWatcherRepository } from '../../infrastructure/repositories/dynamo-watcher-repository';
-import { docClient } from '../../infrastructure/config/aws';
-import { type MetlexLinks, MetlexLinksSchema } from '../../schemas/metlex-link.schema';
-import type { PositionResponse } from '../../schemas/position-response.schema';
-import { buildPositionImage, buildPositionMessage, buildTriggeredMessage } from '../utils/position-ui';
+import type { Message, Client, TextChannel } from 'discord.js';
+import { DynamoWalletWatchRepository } from '../../infrastructure/repositories/dynamo-wallet-watch-repository';
 import { logger } from '../../shared/logger';
-import type { Watcher, WatcherProps } from '../../domain/entities/watcher';
-import { safePin } from '../utils/safe-pin';
-import { type TakeProfitTrigger, TakeProfitTriggerSchema } from '../../schemas/takeprofit-message.schema';
+import { extractDataFromMessage, getPreviousMessage, isCandidateMessage } from '../utils/message-utils';
 import { PositionFetcher } from '../../infrastructure/services/position-fetcher';
 import { aggregatePositions } from '../utils/aggregate-positions';
-
-const watcherRepo = new DynamoWatcherRepository(docClient);
+import type { PositionResponse } from '../../schemas/position-response.schema';
+import { type TakeProfitTrigger, TakeProfitTriggerSchema } from '../../schemas/takeprofit-message.schema';
+import { buildPositionImage, buildPositionMessage, buildTriggeredMessage } from '../utils/position-ui';
+import { safePin } from '../utils/safe-pin';
+import type { WalletWatch } from '../../domain/entities/wallet-watch';
 
 export function registerClosedMessageListener(client: Client) {
   client.on('messageCreate', onMessageCreate);
@@ -19,57 +16,36 @@ export function registerClosedMessageListener(client: Client) {
 
 async function onMessageCreate(message: Message) {
   try {
-    if (!message.guildId || !isCandidateMessage(message)) return;
+    if (!message.guildId) return;
+    if (!isCandidateMessage(message)) return;
 
-    const metlexLinks = extractMetlexLinks(message.content);
-    if (!metlexLinks) return;
+    const data = extractDataFromMessage(message.content);
+    if (!data) return;
+    const { walletPrefix, hashs } = data;
 
-    const watcher = await fetchWatcherConfig(message.guildId, message.channelId);
-    if (!watcher) return;
+    const repo = new DynamoWalletWatchRepository();
+    const watchers = await repo.listByChannelAndWalletPrefixAndNotify(message.channelId, walletPrefix);
+    if (!watchers || watchers.length === 0) return;
 
     const fetcher = PositionFetcher.getInstance();
-    const positions = await fetcher.fetchPositions(metlexLinks);
+    const positions = await fetcher.fetchPositions(hashs);
 
     const aggregated = aggregatePositions(positions);
 
     const previousMessage = await getPreviousMessage(message);
 
-    await replyWithPosition(message, previousMessage, watcher, aggregated);
+    for (const watcher of watchers) {
+      await replyWithPosition(message, previousMessage, watcher, aggregated);
+    }
   } catch (err) {
     logger.error('closed-message listener failed', err instanceof Error ? err : new Error(String(err)));
-  }
-}
-
-export function isCandidateMessage(message: Message): boolean {
-  // const fromBotButNotWebhook = message.author.bot && !message.webhookId;
-  const fromBotButNotWebhook = true; // TODO dev mode
-  return (
-    fromBotButNotWebhook &&
-    message.guildId !== null &&
-    message.channel.type === ChannelType.GuildText &&
-    message.content.trim().startsWith('🟨Closed')
-  );
-}
-
-export function extractMetlexLinks(content: string): MetlexLinks | null {
-  const result = MetlexLinksSchema.safeParse(content);
-  return result.success ? result.data : null;
-}
-
-async function fetchWatcherConfig(guildId: string, channelId: string): Promise<Watcher | null> {
-  try {
-    const w = await watcherRepo.findByGuildAndChannel(guildId, channelId);
-    return w?.followed ? w : null;
-  } catch (err) {
-    logger.error('DB error fetching watcher', err instanceof Error ? err : new Error(String(err)));
-    return null;
   }
 }
 
 export async function replyWithPosition(
   message: Message,
   previousMessage: Message | null,
-  watcher: WatcherProps,
+  watcher: WalletWatch,
   response: PositionResponse,
 ): Promise<void> {
   const channel = message.channel as TextChannel;
@@ -121,25 +97,5 @@ export async function replyWithPosition(
 
   if (watcher.pin) {
     await safePin(sent);
-  }
-}
-
-/**
- * Fetch the single message immediately before `message` in its channel,
- * or null if none or on error.
- */
-export async function getPreviousMessage(message: Message): Promise<Message | null> {
-  if (message.channel.type !== ChannelType.GuildText) return null;
-  try {
-    const msgs = await (message.channel as TextChannel).messages.fetch({
-      before: message.id,
-      limit: 1,
-    });
-    return msgs.first() ?? null;
-  } catch (err) {
-    logger.warn('Failed to fetch previous message', {
-      error: err instanceof Error ? err : new Error(String(err)),
-    });
-    return null;
   }
 }

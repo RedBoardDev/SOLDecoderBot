@@ -1,54 +1,55 @@
-import { SlashCommandBuilder, type ChatInputCommandInteraction, PermissionFlagsBits, MessageFlags } from 'discord.js';
-import { ListWatchersUseCase } from '../../application/use-cases/list-watchers.use-case';
-import { DynamoWatcherRepository } from '../../infrastructure/repositories/dynamo-watcher-repository';
-import { docClient } from '../../infrastructure/config/aws';
+import {
+  SlashCommandBuilder,
+  type ChatInputCommandInteraction,
+  PermissionFlagsBits,
+  MessageFlags,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} from 'discord.js';
+import { GetGuildSettingsUseCase } from '../../application/use-cases/get-guild-settings.use-case';
+import { DynamoGuildSettingsRepository } from '../../infrastructure/repositories/dynamo-guild-settings-repository';
 import { logger } from '../../shared/logger';
 import { UserError } from '../../application/errors/application-errors';
-import { buildWatchersEmbed, buildWatchersComponents } from '../utils/watchers-ui';
+import { buildWatchersEmbed } from '../utils/watchers-ui';
 
 export const watchersCommand = {
   data: new SlashCommandBuilder()
     .setName('watchers')
-    .setDescription('Displays the dashboard of watched channels')
+    .setDescription('Displays the main dashboard')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction: ChatInputCommandInteraction) {
     const flags = MessageFlags.Ephemeral;
-    const useCase = new ListWatchersUseCase(new DynamoWatcherRepository(docClient));
+    await interaction.deferReply({ flags });
+
+    if (!interaction.guildId) {
+      throw new UserError('This command must be used in a server.');
+    }
 
     try {
-      if (!interaction.guildId) {
-        throw new UserError('This command must be used in a server.');
-      }
-      await interaction.deferReply({ flags });
+      const settingsUseCase = new GetGuildSettingsUseCase(new DynamoGuildSettingsRepository());
+      const settings = await settingsUseCase.execute(interaction.guildId);
 
-      const watchers = await useCase.execute({ guildId: interaction.guildId });
-      if (watchers.length === 0) {
-        await interaction.editReply({ content: 'No watched channels for this server.' });
-        return;
-      }
+      const embed = buildWatchersEmbed(settings.timezone);
 
-      const embed = buildWatchersEmbed(watchers);
-      const components = buildWatchersComponents(watchers);
+      const components = [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId('watchers:setTimezone')
+            .setLabel('⏰ Set Timezone')
+            .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId('watchers:walletSettings')
+            .setLabel('⚙️ Wallet Settings')
+            .setStyle(ButtonStyle.Secondary),
+        ),
+      ];
 
       await interaction.editReply({ embeds: [embed], components });
     } catch (err: unknown) {
-      const already = interaction.deferred || interaction.replied;
-      if (err instanceof UserError) {
-        if (already) {
-          await interaction.editReply({ content: `❌ ${err.message}` });
-        } else {
-          await interaction.reply({ content: `❌ ${err.message}`, flags });
-        }
-      } else {
-        logger.error('watchersCommand failed', err instanceof Error ? err : new Error(String(err)));
-        const msg = '❌ Internal error, please try again later.';
-        if (already) {
-          await interaction.editReply({ content: msg });
-        } else {
-          await interaction.reply({ content: msg, flags });
-        }
-      }
+      logger.error('watchersCommand failed', err instanceof Error ? err : new Error(String(err)));
+      await interaction.editReply({ content: 'Interla error, please try again later.' });
     }
   },
 };
