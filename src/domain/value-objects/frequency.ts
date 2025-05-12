@@ -1,29 +1,22 @@
-import { InvalidFrequencyError } from '../errors/domain-errors';
+export type Frequency = 'DAY' | 'WEEK' | 'MONTH';
 
-export type FrequencyType = 'DAY' | 'WEEK' | 'MONTH';
+const ALL_FREQUENCIES: Frequency[] = ['DAY', 'WEEK', 'MONTH'];
 
-export class Frequency {
-  private constructor(private readonly freq: FrequencyType) {}
+export class FrequencyVO {
+  private constructor(private readonly value: Frequency) {}
 
-  static readonly DAY = new Frequency('DAY');
-  static readonly WEEK = new Frequency('WEEK');
-  static readonly MONTH = new Frequency('MONTH');
-
-  static create(input: string): Frequency {
-    const up = input.trim().toUpperCase();
-    switch (up) {
-      case 'DAY':
-        return Frequency.DAY;
-      case 'WEEK':
-        return Frequency.WEEK;
-      case 'MONTH':
-        return Frequency.MONTH;
-      default:
-        throw new InvalidFrequencyError(input);
+  static create(value: string): FrequencyVO {
+    if (!ALL_FREQUENCIES.includes(value as Frequency)) {
+      throw new Error(`Invalid frequency: ${value}`);
     }
+    return new FrequencyVO(value as Frequency);
   }
 
-  toString(): FrequencyType {
-    return this.freq;
+  get raw(): Frequency {
+    return this.value;
+  }
+
+  static all(): Frequency[] {
+    return [...ALL_FREQUENCIES];
   }
 }
