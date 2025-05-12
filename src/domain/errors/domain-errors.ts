@@ -10,15 +10,3 @@ export class InvalidThresholdError extends DomainError {
     super(`Threshold must be between 0 and 100 (inclusive); got ${value}`);
   }
 }
-
-export class InvalidFrequencyError extends DomainError {
-  constructor(value: string) {
-    super(`Frequency must be one of DAY, WEEK, MONTH; got "${value}"`);
-  }
-}
-
-export class EntityValidationError extends DomainError {
-  constructor(entity: string, reason: string) {
-    super(`Invalid ${entity}: ${reason}`);
-  }
-}

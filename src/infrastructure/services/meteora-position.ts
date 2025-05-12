@@ -18,8 +18,8 @@ export class MeteoraPositionService {
   private programPublicKey: PublicKey;
 
   private constructor(connection?: Connection, programId?: string) {
-    this.connection = connection ?? new Connection(config.solanaRpcEndpoint, 'finalized');
-    this.programPublicKey = programId ? new PublicKey(programId) : new PublicKey(config.meteoraProgramId);
+    this.connection = connection ?? new Connection(config.solana.rpcEndpoint, 'finalized');
+    this.programPublicKey = programId ? new PublicKey(programId) : new PublicKey(config.solana.programId);
   }
 
   public static getInstance(): MeteoraPositionService {
@@ -29,16 +29,11 @@ export class MeteoraPositionService {
     return MeteoraPositionService.instance;
   }
 
-  /**
-   * Returns the main account key from a Meteora transaction.
-   * @throws NotFoundError if transaction is missing or not finalized
-   * @throws InternalError on RPC error or failed transaction
-   */
   public async getMainPosition(txSignature: string): Promise<string> {
     const tx = await this.fetchParsedTransaction(txSignature);
 
     if (tx.meta?.err) {
-      throw new InternalError(`Transaction ${txSignature} a échoué: ${JSON.stringify(tx.meta.err)}`);
+      throw new InternalError(`Transaction ${txSignature} failed: ${JSON.stringify(tx.meta.err)}`);
     }
 
     const allInstrs = this.collectAllInstructions(tx);
@@ -49,7 +44,6 @@ export class MeteoraPositionService {
     return this.extractFirstAccount(chosen.instr);
   }
 
-  /** Fetch transaction with v0+legacy support and finalized commitment */
   private async fetchParsedTransaction(signature: string): Promise<ParsedTransactionWithMeta> {
     let tx: ParsedTransactionWithMeta | null = null;
     let lastError: Error | null = null;
@@ -65,15 +59,14 @@ export class MeteoraPositionService {
 
     if (!tx) {
       if (lastError) {
-        throw new InternalError(`Erreur RPC fetching tx ${signature}: ${lastError.message}`);
+        throw new InternalError(`RPC error while fetching transaction ${signature}: ${lastError.message}`);
       }
-      throw new NotFoundError(`Transaction ${signature} non trouvée ou pas encore finalisée`);
+      throw new NotFoundError(`Transaction ${signature} not found or not yet finalized`);
     }
 
     return tx;
   }
 
-  /** Concatenates top-level + inner instructions */
   private collectAllInstructions(tx: ParsedTransactionWithMeta): SolanaInstruction[] {
     const { message } = tx.transaction;
     const top = message.instructions as SolanaInstruction[];
@@ -81,7 +74,6 @@ export class MeteoraPositionService {
     return [...top, ...inner];
   }
 
-  /** Keeps only instructions from Meteora program */
   private filterByProgram(instrs: SolanaInstruction[]): SolanaInstruction[] {
     const ppk = this.programPublicKey;
     const filtered = instrs.filter((ix) => {
@@ -90,15 +82,11 @@ export class MeteoraPositionService {
     });
 
     if (filtered.length === 0) {
-      throw new NotFoundError(`Aucune instruction pour le programme ${ppk.toBase58()}`);
+      throw new NotFoundError(`No instructions found for the program ${ppk.toBase58()}`);
     }
     return filtered;
   }
 
-  /**
-   * Maps each instruction to its type by reading logs
-   * (invoke→Instruction:XXX→success)
-   */
   private typeInstructions(
     instrs: SolanaInstruction[],
     logs: readonly string[],
@@ -111,15 +99,12 @@ export class MeteoraPositionService {
 
     for (const instr of instrs) {
       let type = 'Unknown';
-      // find next invoke
       const invokeIdx = logs.findIndex((l, i) => i >= logPos && l.includes(invokeSig));
       if (invokeIdx >= 0) {
-        // look for the “Instruction:” log
         const entry = logs.slice(invokeIdx + 1).find((l) => l.startsWith('Program log: Instruction:'));
         if (entry) {
           type = entry.replace('Program log: Instruction: ', '');
         }
-        // advance pointer past “success”
         const successIdx = logs.findIndex((l, i) => i > invokeIdx && l.includes(successSig));
         logPos = successIdx >= 0 ? successIdx + 1 : invokeIdx + 1;
       }
@@ -129,7 +114,6 @@ export class MeteoraPositionService {
     return result;
   }
 
-  /** Prioritizes selecting an instruction from RELEVANT_INSTRUCTIONS */
   private selectInstruction(typed: { instr: SolanaInstruction; type: string }[]) {
     for (const rel of RELEVANT_INSTRUCTIONS) {
       const found = typed.find((t) => t.type === rel);
@@ -138,10 +122,6 @@ export class MeteoraPositionService {
     return typed[0];
   }
 
-  /**
-   * Extracts the first account, whether from parsedInstruction.accounts
-   * (string[]) or PartiallyDecodedInstruction.keys (PublicKey).
-   */
   private extractFirstAccount(instr: SolanaInstruction): string {
     if ('accounts' in instr && Array.isArray(instr.accounts) && instr.accounts.length) {
       const acct = instr.accounts[0];
@@ -151,6 +131,6 @@ export class MeteoraPositionService {
     if ('keys' in instr && Array.isArray(instr.keys) && instr.keys.length) {
       return instr.keys[0].pubkey.toBase58();
     }
-    throw new InternalError('Impossible d’extraire de compte de l’instruction');
+    throw new InternalError('Unable to extract account from the instruction');
   }
 }

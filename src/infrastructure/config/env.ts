@@ -1,33 +1,63 @@
-import dotenv from 'dotenv';
 import path from 'node:path';
+import dotenv from 'dotenv';
+import { z } from 'zod';
 import { _dirname } from '../../shared/files';
 
 dotenv.config({ path: path.resolve(_dirname, '../../.env') });
 
-// if (!process.env.DISCORD_TOKEN) {
-//   throw new Error('DISCORD_TOKEN must be set in .env');
-// }
-// if (!process.env.AWS_REGION) {
-//   throw new Error('AWS_REGION must be set in .env');
-// }
-// if (!process.env.AWS_ACCESS_KEY_ID) {
-//   throw new Error('AWS_ACCESS_KEY_ID must be set in .env');
-// }
-// if (!process.env.AWS_SECRET_ACCESS_KEY) {
-//   throw new Error('AWS_SECRET_ACCESS_KEY must be set in .env');
-// }
-// if (!process.env.DYNAMO_TABLE_NAME) {
-//   throw new Error('DYNAMO_TABLE_NAME must be set in .env');
-// }
+const EnvSchema = z.object({
+  // Discord
+  DISCORD_TOKEN: z.string().nonempty(),
+
+  // AWS
+  AWS_REGION: z.string().nonempty(),
+  AWS_ACCESS_KEY_ID: z.string().nonempty(),
+  AWS_SECRET_ACCESS_KEY: z.string().nonempty(),
+
+  // DynamoDB table names
+  DYNAMODB_SETTINGS_TABLE_NAME: z.string().nonempty(),
+  DYNAMODB_WALLETS_TABLE_NAME: z.string().nonempty(),
+
+  // AWS Scheduler role ARN
+  // SCHEDULER_ROLE_ARN: z.string().nonempty(),
+
+  // summary Lambda ARN
+  // SUMMARY_LAMBDA_ARN: z.string().nonempty(),
+
+  // Solana RPC
+  SOLANA_RPC_ENDPOINT: z.string().url().default('https://api.mainnet-beta.solana.com'),
+
+  // Meteora Program
+  METEORA_PROGRAM_ID: z.string().nonempty(),
+});
+
+const _env = EnvSchema.safeParse(process.env);
+if (!_env.success) {
+  console.error('❌ Invalid or missing environment variables:', _env.error.format());
+  process.exit(1);
+}
 
 export const config = {
-  discordToken: process.env.DISCORD_TOKEN ?? '',
-  awsRegion: process.env.AWS_REGION ?? '',
-  dynamoTableName: process.env.DYNAMODB_TABLE_NAME ?? '',
-  awsCredentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
+  discordToken: _env.data.DISCORD_TOKEN,
+  aws: {
+    region: _env.data.AWS_REGION,
+    credentials: {
+      accessKeyId: _env.data.AWS_ACCESS_KEY_ID,
+      secretAccessKey: _env.data.AWS_SECRET_ACCESS_KEY,
+    },
+    // schedulerRoleArn: _env.data.SCHEDULER_ROLE_ARN,
+    tables: {
+      settings: _env.data.DYNAMODB_SETTINGS_TABLE_NAME,
+      wallets: _env.data.DYNAMODB_WALLETS_TABLE_NAME,
+    },
+    lambda: {
+      // summaryArn: _env.data.SUMMARY_LAMBDA_ARN,
+    },
   },
-  solanaRpcEndpoint: process.env.SOLANA_RPC_ENDPOINT ?? 'https://api.mainnet-beta.solana.com',
-  meteoraProgramId: process.env.METEORA_PROGRAM_ID ?? '',
-};
+  solana: {
+    rpcEndpoint: _env.data.SOLANA_RPC_ENDPOINT,
+    programId: _env.data.METEORA_PROGRAM_ID,
+  },
+} as const;
+
+export type Config = typeof config;

@@ -1,121 +1,55 @@
-import path from 'node:path';
-import dotenv from 'dotenv';
-
 import {
   DynamoDBClient,
-  type QueryCommandInput,
-  type QueryCommandOutput,
-  type ScanCommandInput,
-  type ScanCommandOutput,
   UpdateItemCommand,
   type UpdateItemCommandInput,
   type UpdateItemCommandOutput,
 } from '@aws-sdk/client-dynamodb';
 import {
-  BatchWriteCommand,
-  type BatchWriteCommandInput,
-  type BatchWriteCommandOutput,
-  DeleteCommand,
-  type DeleteCommandInput,
-  type DeleteCommandOutput,
   DynamoDBDocumentClient,
-  GetCommand,
-  type GetCommandInput,
-  type GetCommandOutput,
   PutCommand,
   type PutCommandInput,
   type PutCommandOutput,
+  GetCommand,
+  type GetCommandInput,
+  type GetCommandOutput,
   QueryCommand,
+  type QueryCommandInput,
+  type QueryCommandOutput,
   ScanCommand,
+  type ScanCommandInput,
+  type ScanCommandOutput,
+  DeleteCommand,
+  type DeleteCommandInput,
+  BatchWriteCommand,
+  type BatchWriteCommandInput,
+  type BatchWriteCommandOutput,
   UpdateCommand,
   type UpdateCommandInput,
   type UpdateCommandOutput,
 } from '@aws-sdk/lib-dynamodb';
-
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+import { config } from '../config/env';
 
 const credentials = {
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
+  accessKeyId: config.aws.credentials.accessKeyId,
+  secretAccessKey: config.aws.credentials.secretAccessKey,
 };
-console.log('process.env.AWS_ACCESS_KEY_ID', process.env.AWS_ACCESS_KEY_ID);
-let dbParams: { region: string; credentials: { accessKeyId: string; secretAccessKey: string }; endpoint?: string } = {
-  region: process.env.AWS_REGION ?? '',
+const client = new DynamoDBClient({
+  region: config.aws.region,
   credentials,
-};
-
-dbParams = { region: process.env.AWS_REGION ?? '', credentials };
-
-const client = new DynamoDBClient(dbParams);
+});
 const docClient = DynamoDBDocumentClient.from(client, {
-  marshallOptions: {
-    removeUndefinedValues: true,
-  },
+  marshallOptions: { removeUndefinedValues: true },
 });
 
 export default class DynamoService {
-  create = async (params: PutCommandInput): Promise<PutCommandOutput> => {
-    try {
-      return await docClient.send(new PutCommand(params));
-    } catch (error) {
-      throw new Error(`create-error: ${error}`);
-    }
-  };
-
-  batchWrite = async (params: BatchWriteCommandInput): Promise<BatchWriteCommandOutput> => {
-    try {
-      return await docClient.send(new BatchWriteCommand(params));
-    } catch (error) {
-      throw new Error(`batch-create-error: ${error}`);
-    }
-  };
-
-  update = async (params: UpdateCommandInput): Promise<UpdateCommandOutput> => {
-    try {
-      return await docClient.send(new UpdateCommand(params));
-    } catch (error) {
-      throw new Error(`update-error: ${error}`);
-    }
-  };
-
-  updateItem = async (params: UpdateItemCommandInput): Promise<UpdateItemCommandOutput> => {
-    try {
-      return await docClient.send(new UpdateItemCommand(params));
-    } catch (error) {
-      throw new Error(`update-error: ${error}`);
-    }
-  };
-
-  query = async (params: QueryCommandInput): Promise<QueryCommandOutput> => {
-    try {
-      return await docClient.send(new QueryCommand(params));
-    } catch (error) {
-      console.error('error', error);
-      throw new Error(`query-error: ${error}`);
-    }
-  };
-
-  scan = async (params: ScanCommandInput): Promise<ScanCommandOutput> => {
-    try {
-      return await docClient.send(new ScanCommand(params));
-    } catch (error) {
-      throw new Error(`query-error: ${error}`);
-    }
-  };
-
-  get = async (params: GetCommandInput): Promise<GetCommandOutput> => {
-    try {
-      return await docClient.send(new GetCommand(params));
-    } catch (error) {
-      throw new Error(`get-error: ${error}`);
-    }
-  };
-
-  delete = async (params: DeleteCommandInput): Promise<DeleteCommandOutput> => {
-    try {
-      return await docClient.send(new DeleteCommand(params));
-    } catch (error) {
-      throw new Error(`delete-error: ${error}`);
-    }
-  };
+  create = (params: PutCommandInput): Promise<PutCommandOutput> => docClient.send(new PutCommand(params));
+  get = (params: GetCommandInput): Promise<GetCommandOutput> => docClient.send(new GetCommand(params));
+  query = (params: QueryCommandInput): Promise<QueryCommandOutput> => docClient.send(new QueryCommand(params));
+  scan = (params: ScanCommandInput): Promise<ScanCommandOutput> => docClient.send(new ScanCommand(params));
+  delete = (params: DeleteCommandInput): Promise<void> => docClient.send(new DeleteCommand(params)).then(() => {});
+  batchWrite = (params: BatchWriteCommandInput): Promise<BatchWriteCommandOutput> =>
+    docClient.send(new BatchWriteCommand(params));
+  update = (params: UpdateCommandInput): Promise<UpdateCommandOutput> => docClient.send(new UpdateCommand(params));
+  updateItem = (params: UpdateItemCommandInput): Promise<UpdateItemCommandOutput> =>
+    docClient.send(new UpdateItemCommand(params));
 }

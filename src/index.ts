@@ -1,16 +1,13 @@
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, GatewayIntentBits, MessageFlags } from 'discord.js';
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 import { config } from './infrastructure/config/env';
 import { logger } from './shared/logger';
 import { setupErrorHandler } from './shared/error-handler';
+import { registerWatchersInteractionHandlers } from './presentation/listeners/watchers-interaction';
 import { watchersCommand } from './presentation/commands/watchers.command';
-import { watchCommand } from './presentation/commands/watch.command';
-import { unwatchCommand } from './presentation/commands/unwatch.command';
-import { registerWatchersInteractionHandlers } from './presentation/listeners/watchers.interaction.listener';
+import { registerWalletDetailInteractionHandlers } from './presentation/listeners/watchers-interaction/wallet-settings';
 import { registerClosedMessageListener } from './presentation/listeners/closed-message.listener';
-import { cardCommand } from './presentation/commands/card.command';
-import { scanCommand } from './presentation/commands/scan.command';
 
 async function startBot(): Promise<void> {
   logger.info('Initializing Metlex Watcher Bot');
@@ -21,13 +18,7 @@ async function startBot(): Promise<void> {
   });
 
   const rest = new REST({ version: '10' }).setToken(config.discordToken);
-  const commandsPayload = [
-    watchCommand.data.toJSON(),
-    unwatchCommand.data.toJSON(),
-    watchersCommand.data.toJSON(),
-    cardCommand.data.toJSON(),
-    scanCommand.data.toJSON(),
-  ];
+  const commandsPayload = [watchersCommand.data.toJSON()];
 
   client.once('ready', async () => {
     logger.info(`Logged in as ${client.user?.tag}`);
@@ -45,26 +36,21 @@ async function startBot(): Promise<void> {
 
     const { commandName } = interaction;
 
-    const commands: Record<string, typeof watchCommand | typeof unwatchCommand | typeof watchersCommand> = {
-      [watchCommand.data.name]: watchCommand,
-      [unwatchCommand.data.name]: unwatchCommand,
+    const commands: Record<string, typeof watchersCommand> = {
       [watchersCommand.data.name]: watchersCommand,
-      [cardCommand.data.name]: cardCommand,
-      [scanCommand.data.name]: scanCommand,
     };
 
     const command = commands[commandName];
     if (command) {
       await command.execute(interaction);
     } else {
-      await interaction.reply({ content: 'Unknown command', ephemeral: true });
+      await interaction.reply({ content: 'Unknown command', flags: MessageFlags.Ephemeral });
     }
   });
 
   // register events
   registerWatchersInteractionHandlers(client);
-
-  // register listeners
+  registerWalletDetailInteractionHandlers(client);
   registerClosedMessageListener(client);
 
   client.on('error', (error) => {
