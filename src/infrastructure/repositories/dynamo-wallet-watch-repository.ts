@@ -1,74 +1,123 @@
-import DynamoService from '../services/dynamo-service';
 import type { IWalletWatchRepository } from '../../domain/interfaces/i-wallet-watch-repository';
-import { WalletWatch } from '../../domain/entities/wallet-watch';
-import { Threshold } from '../../domain/value-objects/threshold';
+import { WalletWatch, type WalletItem } from '../../domain/entities/wallet-watch';
+import DynamoService from '../services/dynamo-service';
 import { config } from '../config/env';
-
-type DynamoItem = {
-  PK: string;
-  SK: string;
-  channelId: string;
-  threshold: number;
-  image: boolean;
-  pin: boolean;
-  tagId?: string;
-  tagType?: string;
-  summaryDaily: number;
-  summaryWeekly: number;
-  summaryMonthly: number;
-  notifyOnClose: number;
-};
 
 export class DynamoWalletWatchRepository implements IWalletWatchRepository {
   private readonly service = new DynamoService();
   private readonly table = config.aws.tables.wallets;
   private readonly skPrefix = 'WALLET#';
 
-  async save(w: WalletWatch): Promise<void> {
-    const item: DynamoItem = {
-      PK: `GUILD#${w.guildId}`,
-      SK: `${this.skPrefix}${w.address}#CHAN#${w.channelId}`,
-      channelId: w.channelId,
-      threshold: w.threshold.value,
-      image: w.image,
-      pin: w.pin,
-      ...(w.tagId && { tagId: w.tagId }),
-      ...(w.tagType && { tagType: w.tagType }),
-      summaryDaily: w.summaryDaily ? 1 : 0,
-      summaryWeekly: w.summaryWeekly ? 1 : 0,
-      summaryMonthly: w.summaryMonthly ? 1 : 0,
-      notifyOnClose: w.notifyOnClose ? 1 : 0,
+  private buildKey(guildId: string, address: string, channelId: string) {
+    return {
+      PK: `GUILD#${guildId}`,
+      SK: `${this.skPrefix}${address}#CHAN#${channelId}`,
     };
-    await this.service.create({ TableName: this.table, Item: item as any });
+  }
+
+  async create(guildId: string, address: string, channelId: string): Promise<void> {
+    const { PK, SK } = this.buildKey(guildId, address, channelId);
+    const item: WalletItem = {
+      PK,
+      SK,
+      channelId,
+      threshold: 0,
+      image: 0,
+      pin: 0,
+      summaryDaily: 0,
+      summaryWeekly: 0,
+      summaryMonthly: 0,
+      notifyOnClose: 0,
+    };
+    await this.service.create({
+      TableName: this.table,
+      Item: item as any,
+      ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)',
+    });
+  }
+
+  async patch(params: { guildId: string; address: string; channelId: string } & Partial<WalletItem>) {
+    const { guildId, address, channelId, ...rest } = params;
+    const { PK, SK } = this.buildKey(guildId, address, channelId);
+
+    const setExp: string[] = [];
+    const removeExp: string[] = [];
+    const ExpressionAttributeNames: Record<string, string> = {};
+    const ExpressionAttributeValues: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(rest)) {
+      if (value === undefined || value === null) {
+        removeExp.push(key);
+      } else {
+        const nameKey = `#${key}`;
+        const valueKey = `:${key}`;
+        ExpressionAttributeNames[nameKey] = key;
+        ExpressionAttributeValues[valueKey] = value;
+        setExp.push(`${nameKey} = ${valueKey}`);
+      }
+    }
+
+    let UpdateExpression = '';
+    if (setExp.length) UpdateExpression += `SET ${setExp.join(', ')}`;
+    if (removeExp.length) {
+      if (UpdateExpression) UpdateExpression += ' ';
+      UpdateExpression += `REMOVE ${removeExp.join(', ')}`;
+    }
+
+    await this.service.update({
+      TableName: this.table,
+      Key: { PK, SK },
+      UpdateExpression,
+      ExpressionAttributeNames: Object.keys(ExpressionAttributeNames).length > 0 ? ExpressionAttributeNames : undefined,
+      ExpressionAttributeValues:
+        Object.keys(ExpressionAttributeValues).length > 0 ? ExpressionAttributeValues : undefined,
+    });
   }
 
   async delete(guildId: string, address: string, channelId: string): Promise<void> {
-    const sk = `${this.skPrefix}${address}#CHAN#${channelId}`;
-    await this.service.delete({
-      TableName: this.table,
-      Key: { PK: `GUILD#${guildId}`, SK: sk },
-    });
+    const { PK, SK } = this.buildKey(guildId, address, channelId);
+    await this.service.delete({ TableName: this.table, Key: { PK, SK } });
   }
 
-  private async mapItems(items: DynamoItem[]): Promise<WalletWatch[]> {
-    return items.map((i) => {
-      const raw = i.SK.slice(this.skPrefix.length);
-      const [address, , channelId] = raw.split('#');
-      return WalletWatch.create({
-        guildId: i.PK.split('#')[1],
-        address,
-        channelId,
-        threshold: Threshold.create(i.threshold),
-        image: i.image,
-        pin: i.pin,
-        tagId: i.tagId,
-        tagType: (i.tagType as 'USER' | 'ROLE') ?? undefined,
-        summaryDaily: i.summaryDaily === 1,
-        summaryWeekly: i.summaryWeekly === 1,
-        summaryMonthly: i.summaryMonthly === 1,
-        notifyOnClose: i.notifyOnClose === 1,
-      });
+  private mapItems(items: WalletItem[]): WalletWatch[] {
+    return items.map((item) => WalletWatch.fromItem(item));
+  }
+
+  async findByGuildAddressAndChannel(guildId: string, address: string, channelId: string): Promise<WalletWatch | null> {
+    const { PK, SK } = this.buildKey(guildId, address, channelId);
+    const resp = await this.service.get({ TableName: this.table, Key: { PK, SK } });
+    return resp.Item ? WalletWatch.fromItem(resp.Item as WalletItem) : null;
+  }
+
+  async listByGuild(guildId: string): Promise<WalletWatch[]> {
+    const resp = await this.service.query({
+      TableName: this.table,
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+      ExpressionAttributeValues: { ':pk': `GUILD#${guildId}`, ':prefix': this.skPrefix },
     });
+    return this.mapItems((resp.Items as WalletItem[]) ?? []);
+  }
+
+  async listByChannel(channelId: string): Promise<WalletWatch[]> {
+    const resp = await this.service.query({
+      TableName: this.table,
+      IndexName: 'ByChannel',
+      KeyConditionExpression: 'channelId = :c',
+      ExpressionAttributeValues: { ':c': channelId },
+    });
+    return this.mapItems((resp.Items as WalletItem[]) ?? []);
+  }
+
+  async listBySummary(f: 'DAY' | 'WEEK' | 'MONTH'): Promise<WalletWatch[]> {
+    const index = f === 'DAY' ? 'DailyIndex' : f === 'WEEK' ? 'WeeklyIndex' : 'MonthlyIndex';
+    const attr = f === 'DAY' ? 'summaryDaily' : f === 'WEEK' ? 'summaryWeekly' : 'summaryMonthly';
+    const resp = await this.service.query({
+      TableName: this.table,
+      IndexName: index,
+      KeyConditionExpression: `${attr} = :v`,
+      ExpressionAttributeValues: { ':v': 1 },
+    });
+    return this.mapItems((resp.Items as WalletItem[]) ?? []);
   }
 
   async listByNotifyOnClose(): Promise<WalletWatch[]> {
@@ -78,8 +127,7 @@ export class DynamoWalletWatchRepository implements IWalletWatchRepository {
       KeyConditionExpression: 'notifyOnClose = :v',
       ExpressionAttributeValues: { ':v': 1 },
     });
-    const items = (resp.Items as unknown as DynamoItem[]) ?? [];
-    return this.mapItems(items);
+    return this.mapItems((resp.Items as WalletItem[]) ?? []);
   }
 
   async listByChannelAndWalletPrefixAndNotify(channelId: string, walletPrefix: string): Promise<WalletWatch[]> {
@@ -94,63 +142,6 @@ export class DynamoWalletWatchRepository implements IWalletWatchRepository {
         ':n': 1,
       },
     });
-    const items = (resp.Items as unknown as DynamoItem[]) ?? [];
-    return this.mapItems(items);
-  }
-
-  async findByGuildAndAddress(guildId: string, address: string): Promise<WalletWatch | null> {
-    const resp = await this.service.get({
-      TableName: this.table,
-      Key: { PK: `GUILD#${guildId}`, SK: `${this.skPrefix}${address}` },
-    });
-    if (!resp.Item) return null;
-    const item = resp.Item as unknown as DynamoItem;
-    return (await this.mapItems([item]))[0];
-  }
-
-  async findByGuildAddressAndChannel(guildId: string, address: string, channelId: string): Promise<WalletWatch | null> {
-    const sk = `${this.skPrefix}${address}#CHAN#${channelId}`;
-    const resp = await this.service.get({
-      TableName: this.table,
-      Key: { PK: `GUILD#${guildId}`, SK: sk },
-    });
-    if (!resp.Item) return null;
-    return (await this.mapItems([resp.Item as DynamoItem]))[0];
-  }
-
-  async listByGuild(guildId: string): Promise<WalletWatch[]> {
-    const resp = await this.service.query({
-      TableName: this.table,
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-      ExpressionAttributeValues: {
-        ':pk': `GUILD#${guildId}`,
-        ':prefix': this.skPrefix,
-      },
-    });
-    return this.mapItems((resp.Items as DynamoItem[]) ?? []);
-  }
-
-  async listByChannel(channelId: string): Promise<WalletWatch[]> {
-    const resp = await this.service.query({
-      TableName: this.table,
-      IndexName: 'ByChannel',
-      KeyConditionExpression: 'channelId = :c',
-      ExpressionAttributeValues: { ':c': channelId },
-    });
-    const items = (resp.Items as unknown as DynamoItem[]) ?? [];
-    return this.mapItems(items);
-  }
-
-  async listBySummary(f: 'DAY' | 'WEEK' | 'MONTH'): Promise<WalletWatch[]> {
-    const index = f === 'DAY' ? 'DailyIndex' : f === 'WEEK' ? 'WeeklyIndex' : 'MonthlyIndex';
-    const attr = f === 'DAY' ? 'summaryDaily' : f === 'WEEK' ? 'summaryWeekly' : 'summaryMonthly';
-    const resp = await this.service.query({
-      TableName: this.table,
-      IndexName: index,
-      KeyConditionExpression: `${attr} = :v`,
-      ExpressionAttributeValues: { ':v': 1 },
-    });
-    const items = (resp.Items as unknown as DynamoItem[]) ?? [];
-    return this.mapItems(items);
+    return this.mapItems((resp.Items as WalletItem[]) ?? []);
   }
 }
