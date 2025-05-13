@@ -1,6 +1,6 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
 
-export function buildWatchersEmbed(timezone: string): EmbedBuilder {
+export function buildDashboardEmbed(timezone: string): EmbedBuilder {
   const description = [
     '**What is SolDecoderBot?**',
     'SolDecoderBot lets you watch and get notified whenever the SolDecoder strategy closes a position on-chain.',
@@ -24,15 +24,4 @@ export function buildWatchersEmbed(timezone: string): EmbedBuilder {
   ].join('\n');
 
   return new EmbedBuilder().setTitle('📊 Dashboard SolDecoderBot').setDescription(description).setColor(0x00ae86);
-}
-
-export function buildWatchersComponents(): ActionRowBuilder<ButtonBuilder>[] {
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId('watchers:setTimezone').setLabel('🌐 Timezone').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId('watchers:walletSettings')
-      .setLabel('⚙️ Wallets Settings')
-      .setStyle(ButtonStyle.Secondary),
-  );
-  return [row];
 }
