@@ -1,63 +1,53 @@
 import type { ButtonInteraction } from 'discord.js';
 import { DynamoWalletWatchRepository } from '../../../../infrastructure/repositories/dynamo-wallet-watch-repository';
-import { ListWalletWatchesUseCase } from '../../../../application/use-cases/list-wallet-watches.use-case';
-import {
-  buildSingleWalletEmbed,
-  buildWalletDetailComponents,
-  buildThresholdModal,
-  buildWalletsBackComponent,
-} from '../../../utils/wallets-ui';
+import { GetWalletWatchUseCase } from '../../../../application/use-cases/get-wallet-watch.use-case';
+import type { IWalletWatchRepository } from '../../../../domain/interfaces/i-wallet-watch-repository';
+import { buildThresholdModal } from '../../../components/wallets/modals';
+import { buildWalletBackButton, buildWalletDetailButtons } from '../../../components/wallets/detail-buttons';
+import { buildWalletDetailEmbed } from '../../../components/wallets/embeds';
 
 export async function handleWalletButtons(interaction: ButtonInteraction) {
-  const [ns, action, ...rest] = interaction.customId.split(':');
+  const [ns, action, address, channelId] = interaction.customId.split(':');
   if (ns !== 'wallet') return;
 
   const guildId = interaction.guildId;
   if (!guildId) return;
 
-  const address = rest[rest.length - 1];
-  const repo = new DynamoWalletWatchRepository();
-  const watches = await new ListWalletWatchesUseCase(repo).execute({ guildId });
-  const backRow = buildWalletsBackComponent('watchers:walletSettings');
+  const repo: IWalletWatchRepository = new DynamoWalletWatchRepository();
+  const getUseCase = new GetWalletWatchUseCase(repo);
 
   if (action === 'detail') {
-    const target = watches.find((w) => w.address === address);
-    if (!target) return;
+    const watch = await getUseCase.execute({ guildId, address, channelId });
+    const backRow = buildWalletBackButton('watchers:walletSettings');
     await interaction.update({
-      embeds: [buildSingleWalletEmbed(target)],
-      components: [...buildWalletDetailComponents(target), backRow],
+      embeds: [buildWalletDetailEmbed(watch)],
+      components: [...buildWalletDetailButtons(watch), backRow],
     });
     return;
   }
 
   if (action === 'editThreshold') {
-    await interaction.showModal(buildThresholdModal(address));
+    await interaction.showModal(buildThresholdModal(address, channelId));
     return;
   }
+
+  const watch = await getUseCase.execute({ guildId, address, channelId });
+  const backRow = buildWalletBackButton('watchers:walletSettings');
+  const { guildId: g, address: a, channelId: c } = watch.getIdentifiers();
 
   if (action === 'toggleImage') {
-    const target = watches.find((w) => w.address === address);
-    if (!target) return;
-    const updated = target.toggleImage();
-    await repo.save(updated);
-    await interaction.deferUpdate();
-    await interaction.editReply({
-      embeds: [buildSingleWalletEmbed(updated)],
-      components: [...buildWalletDetailComponents(updated), backRow],
-    });
+    const newImage = watch.toggleImage();
+    await repo.patch({ guildId: g, address: a, channelId: c, image: newImage ? 1 : 0 });
+  } else if (action === 'togglePin') {
+    const newPin = watch.togglePin();
+    await repo.patch({ guildId: g, address: a, channelId: c, pin: newPin ? 1 : 0 });
+  } else {
     return;
   }
 
-  if (action === 'togglePin') {
-    const target = watches.find((w) => w.address === address);
-    if (!target) return;
-    const updated = target.togglePin();
-    await repo.save(updated);
-    await interaction.deferUpdate();
-    await interaction.editReply({
-      embeds: [buildSingleWalletEmbed(updated)],
-      components: [...buildWalletDetailComponents(updated), backRow],
-    });
-    return;
-  }
+  await interaction.deferUpdate();
+  await interaction.editReply({
+    embeds: [buildWalletDetailEmbed(watch)],
+    components: [...buildWalletDetailButtons(watch), backRow],
+  });
 }

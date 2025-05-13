@@ -1,7 +1,9 @@
 import type { ButtonInteraction } from 'discord.js';
 import { DynamoWalletWatchRepository } from '../../../infrastructure/repositories/dynamo-wallet-watch-repository';
-import { buildSingleWalletEmbed, buildWalletDetailComponents, buildWalletsBackComponent } from '../../utils/wallets-ui';
-import { ListWalletWatchesUseCase } from '../../../application/use-cases/list-wallet-watches.use-case';
+import { GetWalletWatchUseCase } from '../../../application/use-cases/get-wallet-watch.use-case';
+import { NotFoundError } from '../../../application/errors/application-errors';
+import { buildWalletBackButton, buildWalletDetailButtons } from '../../components/wallets/detail-buttons';
+import { buildWalletDetailEmbed } from '../../components/wallets/embeds';
 
 export async function handleViewWallet(interaction: ButtonInteraction) {
   const [ns, action, address, channelId] = interaction.customId.split(':');
@@ -12,18 +14,28 @@ export async function handleViewWallet(interaction: ButtonInteraction) {
   if (!guildId) return;
 
   const repo = new DynamoWalletWatchRepository();
-  const watches = await new ListWalletWatchesUseCase(repo).execute({ guildId });
-  const watch = watches.find((w) => w.address === address && w.channelId === channelId);
-  if (!watch) {
-    return interaction.editReply({ content: '❌ Wallet not found.', embeds: [], components: [] });
+  const getUseCase = new GetWalletWatchUseCase(repo);
+
+  try {
+    const watch = await getUseCase.execute({ guildId, address, channelId });
+
+    const embed = buildWalletDetailEmbed(watch);
+    const detailRows = buildWalletDetailButtons(watch);
+    const backRow = buildWalletBackButton('watchers:walletSettings');
+
+    await interaction.editReply({
+      embeds: [embed],
+      components: [...detailRows, backRow],
+    });
+  } catch (err: unknown) {
+    if (err instanceof NotFoundError) {
+      await interaction.editReply({
+        content: '❌ Wallet not found.',
+        embeds: [],
+        components: [],
+      });
+    } else {
+      throw err;
+    }
   }
-
-  const embed = buildSingleWalletEmbed(watch);
-  const detailRows = buildWalletDetailComponents(watch);
-  const backRow = buildWalletsBackComponent('watchers:walletSettings');
-
-  await interaction.editReply({
-    embeds: [embed],
-    components: [...detailRows, backRow],
-  });
 }

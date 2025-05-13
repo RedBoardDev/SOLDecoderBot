@@ -7,12 +7,19 @@ import {
 } from 'discord.js';
 import { TimezoneHelper } from '../../../domain/value-objects/timezone';
 import { GetGuildSettingsUseCase } from '../../../application/use-cases/get-guild-settings.use-case';
+import { InitGuildSettingsUseCase } from '../../../application/use-cases/init-guild-settings.use-case';
 import { DynamoGuildSettingsRepository } from '../../../infrastructure/repositories/dynamo-guild-settings-repository';
-import { buildWatchersEmbed } from '../../utils/watchers-ui';
+import { buildDashboardEmbed } from '../../components/dashboard/embeds';
 
 export async function handleWatchersButton(interaction: ButtonInteraction) {
   const [ns, action] = interaction.customId.split(':');
   if (ns !== 'watchers') return;
+
+  const guildId = interaction.guildId;
+  if (!guildId) return;
+
+  const repo = new DynamoGuildSettingsRepository();
+  const getUseCase = new GetGuildSettingsUseCase(repo);
 
   if (action === 'setTimezone') {
     const allTz = TimezoneHelper.all();
@@ -24,25 +31,28 @@ export async function handleWatchersButton(interaction: ButtonInteraction) {
         .setMaxValues(1)
         .addOptions(allTz.map((tz) => ({ label: tz, value: tz }))),
     );
-
     await interaction.deferUpdate();
-
-    await interaction.editReply({
-      content: 'Choose your timezone:',
-      components: [menuRow],
-    });
+    await interaction.editReply({ content: 'Choose your timezone:', components: [menuRow] });
     return;
   }
 
   if (action === 'mainDashboard') {
     await interaction.deferUpdate();
 
-    const settings = await new GetGuildSettingsUseCase(new DynamoGuildSettingsRepository()).execute(
-      interaction.guildId!,
-    );
+    let settings = await getUseCase.execute(guildId);
 
-    const embed = buildWatchersEmbed(settings.timezone);
+    if (settings === null) {
+      const initUseCase = new InitGuildSettingsUseCase(repo);
+      await initUseCase.execute(guildId);
+      settings = await getUseCase.execute(guildId);
+      if (settings === null) {
+        return await interaction.editReply({
+          content: '❌ Unable to initialize settings. Please try again later.',
+        });
+      }
+    }
 
+    const embed = buildDashboardEmbed(settings.timezone);
     const components = [
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()

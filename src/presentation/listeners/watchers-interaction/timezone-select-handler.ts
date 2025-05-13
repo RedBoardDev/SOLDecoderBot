@@ -1,19 +1,22 @@
 import type { StringSelectMenuInteraction } from 'discord.js';
 import { DynamoGuildSettingsRepository } from '../../../infrastructure/repositories/dynamo-guild-settings-repository';
 import { GuildSettings } from '../../../domain/entities/guild-settings';
-import { buildWatchersEmbed } from '../../utils/watchers-ui';
+import { buildDashboardEmbed } from '../../components/dashboard/embeds';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
 export async function handleTimezoneSelect(interaction: StringSelectMenuInteraction) {
   if (interaction.customId !== 'watchers:selectTimezone') return;
 
-  const selectedTz = interaction.values[0]!;
+  await interaction.deferUpdate();
   const guildId = interaction.guildId!;
-  const repo = new DynamoGuildSettingsRepository();
-  const settingsEntity = GuildSettings.create({ guildId, timezone: selectedTz });
-  await repo.save(settingsEntity);
+  const tz = interaction.values[0]!;
 
-  const embed = buildWatchersEmbed(settingsEntity.timezone);
+  const repo = new DynamoGuildSettingsRepository();
+  await repo.patch({ guildId, timezone: tz });
+
+  const updated = GuildSettings.create({ guildId, timezone: tz });
+
+  const embed = buildDashboardEmbed(updated.timezone);
   const components = [
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId('watchers:setTimezone').setLabel('⏰ Set Timezone').setStyle(ButtonStyle.Primary),
@@ -23,5 +26,6 @@ export async function handleTimezoneSelect(interaction: StringSelectMenuInteract
         .setStyle(ButtonStyle.Secondary),
     ),
   ];
-  await interaction.update({ embeds: [embed], components });
+
+  await interaction.editReply({ embeds: [embed], components });
 }
