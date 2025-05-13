@@ -1,4 +1,4 @@
-const COMMON_TIMEZONES = [
+export const COMMON_TIMEZONES = [
   'Europe/London',
   'Europe/Paris',
   'Europe/Berlin',
@@ -23,7 +23,6 @@ const COMMON_TIMEZONES = [
   'Africa/Cairo',
   'Africa/Johannesburg',
   'Pacific/Auckland',
-  'Pacific/Honolulu',
 ] as const;
 
 export type Timezone = (typeof COMMON_TIMEZONES)[number];
