@@ -1,7 +1,6 @@
 import { ZodError } from 'zod';
 import { AddWalletWatchDtoSchema, type AddWalletWatchDto } from '../dtos/add-wallet-watch.dto';
 import type { IWalletWatchRepository } from '../../domain/interfaces/i-wallet-watch-repository';
-import { WalletWatch } from '../../domain/entities/wallet-watch';
 import { ValidationError, AlreadyExistsError, InternalError } from '../errors/application-errors';
 
 export class AddWalletWatchUseCase {
@@ -24,9 +23,8 @@ export class AddWalletWatchUseCase {
       throw new AlreadyExistsError(`Already watching \`${address}\``);
     }
 
-    const watch = WalletWatch.create({ guildId, address, channelId, notifyOnClose: false });
     try {
-      await this.repo.save(watch);
+      await this.repo.create(guildId, address, channelId);
     } catch {
       throw new InternalError('Unable to create watch');
     }
