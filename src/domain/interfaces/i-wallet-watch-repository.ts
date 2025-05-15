@@ -10,8 +10,5 @@ export interface IWalletWatchRepository {
   findByGuildAddressAndChannel(guildId: string, address: string, channelId: string): Promise<WalletWatch | null>;
 
   listByGuild(guildId: string): Promise<WalletWatch[]>;
-  listByChannel(channelId: string): Promise<WalletWatch[]>;
-  listBySummary(frequency: 'DAY' | 'WEEK' | 'MONTH'): Promise<WalletWatch[]>;
-  listByNotifyOnClose(): Promise<WalletWatch[]>;
-  listByChannelAndWalletPrefixAndNotify(channelId: string, walletPrefix: string): Promise<WalletWatch[]>;
+  findByChannelAndWalletPrefixAndNotify(channelId: string, walletPrefix: string): Promise<WalletWatch | null>;
 }

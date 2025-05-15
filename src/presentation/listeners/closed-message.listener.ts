@@ -24,8 +24,8 @@ async function onMessageCreate(message: Message) {
     const { walletPrefix, hashs } = data;
 
     const repo = new DynamoWalletWatchRepository();
-    const watchers = await repo.listByChannelAndWalletPrefixAndNotify(message.channelId, walletPrefix);
-    if (!watchers || watchers.length === 0) return;
+    const watcher = await repo.findByChannelAndWalletPrefixAndNotify(message.channelId, walletPrefix);
+    if (!watcher) return;
 
     const fetcher = PositionFetcher.getInstance();
     const positions = await fetcher.fetchPositions(hashs);
@@ -34,9 +34,9 @@ async function onMessageCreate(message: Message) {
 
     const previousMessage = await getPreviousMessage(message);
 
-    for (const watcher of watchers) {
-      await replyWithPosition(message, previousMessage, watcher, aggregated);
-    }
+    if (aggregated.data.pnl.percentNative <= watcher.threshold) return;
+
+    await replyWithPosition(message, previousMessage, watcher, aggregated);
   } catch (err) {
     logger.error('closed-message listener failed', err instanceof Error ? err : new Error(String(err)));
   }
