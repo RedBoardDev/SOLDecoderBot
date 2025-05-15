@@ -83,6 +83,10 @@ export class DynamoWalletWatchRepository implements IWalletWatchRepository {
     return items.map((item) => WalletWatch.fromItem(item));
   }
 
+  private mapItem(item: WalletItem): WalletWatch {
+    return WalletWatch.fromItem(item);
+  }
+
   async findByGuildAddressAndChannel(guildId: string, address: string, channelId: string): Promise<WalletWatch | null> {
     const { PK, SK } = this.buildKey(guildId, address, channelId);
     const resp = await this.service.get({ TableName: this.table, Key: { PK, SK } });
@@ -98,39 +102,10 @@ export class DynamoWalletWatchRepository implements IWalletWatchRepository {
     return this.mapItems((resp.Items as WalletItem[]) ?? []);
   }
 
-  async listByChannel(channelId: string): Promise<WalletWatch[]> {
-    const resp = await this.service.query({
-      TableName: this.table,
-      IndexName: 'ByChannel',
-      KeyConditionExpression: 'channelId = :c',
-      ExpressionAttributeValues: { ':c': channelId },
-    });
-    return this.mapItems((resp.Items as WalletItem[]) ?? []);
-  }
-
-  async listBySummary(f: 'DAY' | 'WEEK' | 'MONTH'): Promise<WalletWatch[]> {
-    const index = f === 'DAY' ? 'DailyIndex' : f === 'WEEK' ? 'WeeklyIndex' : 'MonthlyIndex';
-    const attr = f === 'DAY' ? 'summaryDaily' : f === 'WEEK' ? 'summaryWeekly' : 'summaryMonthly';
-    const resp = await this.service.query({
-      TableName: this.table,
-      IndexName: index,
-      KeyConditionExpression: `${attr} = :v`,
-      ExpressionAttributeValues: { ':v': 1 },
-    });
-    return this.mapItems((resp.Items as WalletItem[]) ?? []);
-  }
-
-  async listByNotifyOnClose(): Promise<WalletWatch[]> {
-    const resp = await this.service.query({
-      TableName: this.table,
-      IndexName: 'NotifyOnCloseIndex',
-      KeyConditionExpression: 'notifyOnClose = :v',
-      ExpressionAttributeValues: { ':v': 1 },
-    });
-    return this.mapItems((resp.Items as WalletItem[]) ?? []);
-  }
-
-  async listByChannelAndWalletPrefixAndNotify(channelId: string, walletPrefix: string): Promise<WalletWatch[]> {
+  public async findByChannelAndWalletPrefixAndNotify(
+    channelId: string,
+    walletPrefix: string,
+  ): Promise<WalletWatch | null> {
     const resp = await this.service.query({
       TableName: this.table,
       IndexName: 'ByChannel',
@@ -141,7 +116,12 @@ export class DynamoWalletWatchRepository implements IWalletWatchRepository {
         ':sk': `${this.skPrefix}${walletPrefix}`,
         ':n': 1,
       },
+      Limit: 1,
     });
-    return this.mapItems((resp.Items as WalletItem[]) ?? []);
+
+    const items = resp.Items as WalletItem[] | undefined;
+    if (!items || items.length === 0) return null;
+
+    return this.mapItem(items[0]);
   }
 }
