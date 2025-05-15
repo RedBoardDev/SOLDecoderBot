@@ -1,28 +1,40 @@
 export const COMMON_TIMEZONES = [
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'Europe/Moscow',
-  'Asia/Dubai',
-  'Asia/Kolkata',
-  'Asia/Shanghai',
-  'Asia/Tokyo',
-  'Asia/Singapore',
-  'Asia/Seoul',
-  'Australia/Sydney',
-  'Australia/Melbourne',
-  'America/Los_Angeles',
-  'America/Vancouver',
-  'America/Denver',
-  'America/Chicago',
-  'America/New_York',
-  'America/Toronto',
-  'America/Sao_Paulo',
-  'America/Mexico_City',
-  'America/Argentina/Buenos_Aires',
-  'Africa/Cairo',
-  'Africa/Johannesburg',
-  'Pacific/Auckland',
+  // Europe
+  'Europe/London', // Royaume-Uni
+  'Europe/Paris', // France
+  'Europe/Berlin', // Allemagne
+  'Europe/Moscow', // Russie
+  'Europe/Helsinki', // Finlande
+  'Europe/Rome', // Italie
+  'Europe/Madrid', // Espagne
+
+  // Amériques
+  'America/New_York', // EST (USA)
+  'America/Chicago', // CST (USA)
+  'America/Denver', // MST (USA)
+  'America/Los_Angeles', // PST (USA)
+  'America/Toronto', // Canada Est
+  'America/Sao_Paulo', // Brésil
+  'America/Mexico_City', // Mexique
+
+  // Asie
+  'Asia/Dubai', // Émirats
+  'Asia/Kolkata', // Inde
+  'Asia/Shanghai', // Chine
+  'Asia/Tokyo', // Japon
+  'Asia/Singapore', // Singapour
+  'Asia/Seoul', // Corée du Sud
+
+  // Océanie
+  'Australia/Sydney', // Australie Est
+  'Pacific/Auckland', // Nouvelle-Zélande
+
+  // Afrique
+  'Africa/Cairo', // Égypte
+  'Africa/Johannesburg', // Afrique du Sud
+
+  // UTC
+  'Etc/UTC',
 ] as const;
 
 export type Timezone = (typeof COMMON_TIMEZONES)[number];

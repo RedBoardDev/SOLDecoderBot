@@ -39,6 +39,7 @@ export function buildWalletDetailButtons(w: WalletWatch): ActionRowBuilder<Butto
     ),
   );
 
+  // Tag / Clear
   rows.push(
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()

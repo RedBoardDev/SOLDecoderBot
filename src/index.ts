@@ -8,6 +8,7 @@ import { registerWatchersInteractionHandlers } from './presentation/listeners/wa
 import { watchersCommand } from './presentation/commands/watchers.command';
 import { registerWalletDetailInteractionHandlers } from './presentation/listeners/watchers-interaction/wallet-settings';
 import { registerClosedMessageListener } from './presentation/listeners/closed-message.listener';
+import { SummaryScheduler } from './infrastructure/services/summary-scheduler';
 
 async function startBot(): Promise<void> {
   logger.info('Initializing Metlex Watcher Bot');
@@ -30,6 +31,12 @@ async function startBot(): Promise<void> {
       logger.error('Failed to register slash commands', err instanceof Error ? err : new Error(String(err)));
     }
   });
+
+  const testCron = {
+    // TODO remove in prod
+    WEEK: '20 1 * * 3',
+  };
+  SummaryScheduler.getInstance().start(client, testCron);
 
   client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
