@@ -11,9 +11,9 @@ import { logger } from '../../shared/logger';
 import type { Frequency } from '../../domain/value-objects/frequency';
 
 const DEFAULT_CRON: Record<Frequency, string> = {
-  DAY: '0 0 * * *',
-  WEEK: '0 0 * * 1',
-  MONTH: '0 0 1 * *',
+  DAY: '0 0 * * *',  // 00:00 (midnight) every day
+  WEEK: '0 0 * * 1', // Executes at 00:00 (midnight) every Monday
+  MONTH: '0 0 1 * *',// 00:00 (midnight) on the 1st day of every month
 };
 
 export class SummaryScheduler {
