@@ -5,6 +5,7 @@ import { handleWalletDashboard } from './wallet-dashboard-handler';
 import { handleViewWallet } from './view-wallet-handler';
 import { handleChannelSelect } from './add-wallet-channel';
 import { handleAddWalletModal } from './add-wallet-modal';
+import { logger } from '../../../shared/logger';
 
 export function registerWatchersInteractionHandlers(client: Client) {
   client.on('interactionCreate', async (interaction: Interaction) => {
@@ -21,7 +22,7 @@ export function registerWatchersInteractionHandlers(client: Client) {
         await handleTimezoneSelect(interaction);
       }
     } catch (err) {
-      console.error('❌ watchers interaction failed', err);
+      logger.error('❌ watchers interaction failed', err as Error);
     }
   });
 }

@@ -1,3 +1,5 @@
+import type { Frequency } from '../value-objects/frequency';
+
 export interface WalletAttributes {
   channelId: string;
   threshold: number;
@@ -173,7 +175,7 @@ export class WalletWatch {
     return this.props.notifyOnClose;
   }
 
-  setSummary(freq: 'DAY' | 'WEEK' | 'MONTH', enabled: boolean): boolean {
+  setSummary(freq: Frequency, enabled: boolean): boolean {
     switch (freq) {
       case 'DAY':
         this.props.summaryDaily = enabled;

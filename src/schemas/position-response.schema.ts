@@ -27,3 +27,11 @@ export const PositionResponseSchema = z.object({
 });
 
 export type PositionResponse = z.infer<typeof PositionResponseSchema>;
+
+export interface HistoricalPosition {
+  closeAt: string; // ISO-8601
+  pnlUsd: number; // USD
+  pnlSol: number; // SOL
+  feeSol: number; // SOL
+  percent: number; // % change
+}

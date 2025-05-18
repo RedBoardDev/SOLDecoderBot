@@ -11,6 +11,7 @@ import { GetWalletWatchUseCase } from '../../../../application/use-cases/get-wal
 import type { IWalletWatchRepository } from '../../../../domain/interfaces/i-wallet-watch-repository';
 import { buildWalletBackButton, buildWalletDetailButtons } from '../../../components/wallets/detail-buttons';
 import { buildWalletDetailEmbed } from '../../../components/wallets/embeds';
+import { logger } from '../../../../shared/logger';
 
 export function buildThresholdModal(address: string, channelId: string): ModalBuilder {
   return new ModalBuilder()
@@ -33,7 +34,7 @@ export async function handleThresholdModal(interaction: ModalSubmitInteraction) 
 
   const [ns, modal, address, channelId] = interaction.customId.split(':');
   if (!address || !channelId) {
-    console.error('Invalid modal customId, missing address or channelId:', interaction.customId);
+    logger.warn('Invalid modal customId, missing address or channelId', { customId: interaction.customId });
     return;
   }
 
@@ -42,12 +43,18 @@ export async function handleThresholdModal(interaction: ModalSubmitInteraction) 
 
   const twoDecimalRegex = /^\d{1,3}(?:\.\d{1,2})?$/;
   if (!twoDecimalRegex.test(raw)) {
-    await interaction.reply({ content: '❌ Format invalide…', flags: MessageFlags.Ephemeral });
+    await interaction.reply({
+      content: '❌ Invalid format. Please provide a number with up to 2 decimal places.',
+      flags: MessageFlags.Ephemeral,
+    });
     return;
   }
   const parsed = Number.parseFloat(raw);
   if (Number.isNaN(parsed) || parsed < 0.01 || parsed > 100) {
-    await interaction.reply({ content: '❌ Valeur hors limites…', flags: MessageFlags.Ephemeral });
+    await interaction.reply({
+      content: '❌ Value out of bounds. Please provide a number between 0.01 and 100.',
+      flags: MessageFlags.Ephemeral,
+    });
     return;
   }
 

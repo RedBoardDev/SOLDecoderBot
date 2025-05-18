@@ -1,19 +1,12 @@
+import { logger } from '../../shared/logger';
+
 export class RateLimiter {
   private queue: Array<() => Promise<void>> = [];
   private processing = false;
   private readonly intervalMs: number;
 
-  private constructor(intervalMs: number) {
+  constructor(intervalMs: number) {
     this.intervalMs = intervalMs;
-  }
-
-  private static instance: RateLimiter;
-
-  public static getInstance(): RateLimiter {
-    if (!RateLimiter.instance) {
-      RateLimiter.instance = new RateLimiter(500);
-    }
-    return RateLimiter.instance;
   }
 
   public enqueue<T>(task: () => Promise<T>): Promise<T> {
@@ -27,7 +20,7 @@ export class RateLimiter {
         }
       });
       this.processQueue().catch((err) => {
-        console.error('RateLimiter processing error', err);
+        logger.error('RateLimiter processing error', err instanceof Error ? err : new Error(String(err)));
       });
     });
   }

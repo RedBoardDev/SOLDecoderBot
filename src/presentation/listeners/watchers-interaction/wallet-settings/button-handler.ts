@@ -13,11 +13,9 @@ export async function handleWalletButtons(interaction: ButtonInteraction) {
   const guildId = interaction.guildId;
   if (!guildId) return;
 
-  const repo: IWalletWatchRepository = new DynamoWalletWatchRepository();
-  const getUseCase = new GetWalletWatchUseCase(repo);
-
   if (action === 'detail') {
-    const watch = await getUseCase.execute({ guildId, address, channelId });
+    const repo: IWalletWatchRepository = new DynamoWalletWatchRepository();
+    const watch = await new GetWalletWatchUseCase(repo).execute({ guildId, address, channelId });
     const backRow = buildWalletBackButton('watchers:walletSettings');
     await interaction.update({
       embeds: [buildWalletDetailEmbed(watch)],
@@ -31,23 +29,27 @@ export async function handleWalletButtons(interaction: ButtonInteraction) {
     return;
   }
 
-  const watch = await getUseCase.execute({ guildId, address, channelId });
-  const backRow = buildWalletBackButton('watchers:walletSettings');
-  const { guildId: g, address: a, channelId: c } = watch.getIdentifiers();
+  if (action === 'toggleImage' || action === 'togglePin') {
+    const repo: IWalletWatchRepository = new DynamoWalletWatchRepository();
+    const getUseCase = new GetWalletWatchUseCase(repo);
 
-  if (action === 'toggleImage') {
-    const newImage = watch.toggleImage();
-    await repo.patch({ guildId: g, address: a, channelId: c, image: newImage ? 1 : 0 });
-  } else if (action === 'togglePin') {
-    const newPin = watch.togglePin();
-    await repo.patch({ guildId: g, address: a, channelId: c, pin: newPin ? 1 : 0 });
-  } else {
+    const watch = await getUseCase.execute({ guildId, address, channelId });
+    const backRow = buildWalletBackButton('watchers:walletSettings');
+    const { guildId: g, address: a, channelId: c } = watch.getIdentifiers();
+
+    if (action === 'toggleImage') {
+      const newImage = watch.toggleImage();
+      await repo.patch({ guildId: g, address: a, channelId: c, image: newImage ? 1 : 0 });
+    } else {
+      const newPin = watch.togglePin();
+      await repo.patch({ guildId: g, address: a, channelId: c, pin: newPin ? 1 : 0 });
+    }
+
+    await interaction.deferUpdate();
+    await interaction.editReply({
+      embeds: [buildWalletDetailEmbed(watch)],
+      components: [...buildWalletDetailButtons(watch), backRow],
+    });
     return;
   }
-
-  await interaction.deferUpdate();
-  await interaction.editReply({
-    embeds: [buildWalletDetailEmbed(watch)],
-    components: [...buildWalletDetailButtons(watch), backRow],
-  });
 }
