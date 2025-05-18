@@ -5,6 +5,7 @@ enum Background {
   Happy = 'background_happy.png',
   Sad = 'background_sad.png',
   Trump = 'background_trump.png',
+  summary = 'background_summary.png',
 }
 
 function getBackgroundPath(fileName: string): string {
@@ -16,7 +17,7 @@ function shouldUseTrumpBackground(): boolean {
   return Math.random() < TRUMP_CHANCE;
 }
 
-export function selectBackground(pct: number, triggerTakeProfit: boolean): string {
+export function selectBackgroundPNLCard(pct: number, triggerTakeProfit: boolean): string {
   if (triggerTakeProfit === true) {
     return getBackgroundPath(Background.Happy);
   }
@@ -35,4 +36,8 @@ export function selectBackground(pct: number, triggerTakeProfit: boolean): strin
   }
 
   return getBackgroundPath(Background.Default);
+}
+
+export function selectBackgroundSummary(): string {
+  return getBackgroundPath(Background.summary);
 }
