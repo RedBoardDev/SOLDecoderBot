@@ -3,12 +3,13 @@ import { DynamoWalletWatchRepository } from '../../infrastructure/repositories/d
 import { logger } from '../../shared/logger';
 import { extractDataFromMessage, getPreviousMessage, isCandidateMessage } from '../utils/message-utils';
 import { PositionFetcher } from '../../infrastructure/services/position-fetcher';
-import { aggregatePositions } from '../utils/aggregate-positions';
+import { aggregatePositions } from '../../infrastructure/services/aggregate-positions';
 import type { PositionResponse } from '../../schemas/position-response.schema';
 import { type TakeProfitTrigger, TakeProfitTriggerSchema } from '../../schemas/takeprofit-message.schema';
-import { buildPositionImage, buildPositionMessage, buildTriggeredMessage } from '../utils/position-ui';
-import { safePin } from '../utils/safe-pin';
+import { buildPositionMessage, buildTriggeredMessage } from '../ui/position/position-ui';
+import { safePin } from '../ui/shared/safe-pin';
 import type { WalletWatch } from '../../domain/entities/wallet-watch';
+import { buildPositionImage } from '../ui/position/build-position-image';
 
 export function registerClosedMessageListener(client: Client) {
   client.on('messageCreate', onMessageCreate);
@@ -39,6 +40,9 @@ async function onMessageCreate(message: Message) {
     await replyWithPosition(message, previousMessage, watcher, aggregated);
   } catch (err) {
     logger.error('closed-message listener failed', err instanceof Error ? err : new Error(String(err)));
+    if (message.channel?.isSendable()) {
+      await message.channel.send('An unexpected error occurred.');
+    }
   }
 }
 

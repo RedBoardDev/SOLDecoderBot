@@ -3,6 +3,7 @@ import { handleWalletButtons } from './button-handler';
 import { handleThresholdModal } from './modal-handler';
 import { handleTagButtons, handleTagSelect, handleTagButtonsClear } from './tag-handler';
 import { handleSummaryToggle } from './summary-handler';
+import { logger } from '../../../../shared/logger';
 
 export function registerWalletDetailInteractionHandlers(client: Client) {
   client.on('interactionCreate', async (interaction: Interaction) => {
@@ -18,7 +19,7 @@ export function registerWalletDetailInteractionHandlers(client: Client) {
         await handleTagSelect(interaction);
       }
     } catch (err) {
-      console.error('💥 wallet-detail interaction failed', err);
+      logger.error('💥 wallet-detail interaction failed', err as Error);
     }
   });
 }
