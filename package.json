@@ -22,6 +22,7 @@
     "axios": "^1.8.4",
     "chalk": "^5.4.1",
     "chokidar": "^4.0.3",
+    "cron": "^4.3.0",
     "discord-api-types": "^0.37.16",
     "discord.js": "^14.17.0",
     "dotenv": "^16.4.7",

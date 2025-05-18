@@ -83,7 +83,7 @@ async function main() {
     await registerSlashCommands(client.user!.id, config.discordToken);
 
     // start the periodic summary
-    SummaryScheduler.getInstance().run('WEEK', 'Europe/Helsinki', client);
+    SummaryScheduler.getInstance().start(client);
   });
 
   wireInteractionHandler(client);
