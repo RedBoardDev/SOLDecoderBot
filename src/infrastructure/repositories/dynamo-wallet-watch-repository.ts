@@ -2,6 +2,7 @@ import type { IWalletWatchRepository } from '../../domain/interfaces/i-wallet-wa
 import { WalletWatch, type WalletItem } from '../../domain/entities/wallet-watch';
 import DynamoService from '../services/dynamo-service';
 import { config } from '../config/env';
+import type { Frequency } from '../../domain/value-objects/frequency';
 
 export class DynamoWalletWatchRepository implements IWalletWatchRepository {
   private readonly service = new DynamoService();
@@ -102,7 +103,7 @@ export class DynamoWalletWatchRepository implements IWalletWatchRepository {
     return this.mapItems((resp.Items as WalletItem[]) ?? []);
   }
 
-  async listBySummary(f: 'DAY' | 'WEEK' | 'MONTH'): Promise<WalletWatch[]> {
+  async listBySummary(f: Frequency): Promise<WalletWatch[]> {
     const index = f === 'DAY' ? 'DailyIndex' : f === 'WEEK' ? 'WeeklyIndex' : 'MonthlyIndex';
     const attr = f === 'DAY' ? 'summaryDaily' : f === 'WEEK' ? 'summaryWeekly' : 'summaryMonthly';
     const resp = await this.service.query({

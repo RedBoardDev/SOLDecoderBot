@@ -1,27 +1,30 @@
-// src/infrastructure/services/summary-scheduler.ts
 import { CronJob } from 'cron';
-import { TextChannel, type Client } from 'discord.js';
+import type { Client } from 'discord.js';
 import { DynamoWalletWatchRepository } from '../repositories/dynamo-wallet-watch-repository';
 import { DynamoGuildSettingsRepository } from '../repositories/dynamo-guild-settings-repository';
-import { TimezoneHelper, type Timezone } from '../../domain/value-objects/timezone';
+import { type Timezone, TimezoneHelper } from '../../domain/value-objects/timezone';
+import type { WalletWatch } from '../../domain/entities/wallet-watch';
+import { buildSummaryEmbed } from '../../presentation/ui/summary/summary-ui';
+import { buildSummaryImage, type SummaryData } from '../../presentation/ui/summary/build-summary-image';
+import { LpAgentService } from './lpagent-service';
+import { logger } from '../../shared/logger';
+import type { Frequency } from '../../domain/value-objects/frequency';
 
-export type SummaryFreq = 'DAY' | 'WEEK' | 'MONTH';
-
-const DEFAULT_CRON: Record<SummaryFreq, string> = {
-  DAY: '0 0 * * *', // chaque jour à 00:00
-  WEEK: '0 0 * * 1', // chaque lundi à 00:00
-  MONTH: '0 0 1 * *', // chaque 1er du mois à 00:00
+const DEFAULT_CRON: Record<Frequency, string> = {
+  DAY: '0 0 * * *',
+  WEEK: '0 0 * * 1',
+  MONTH: '0 0 1 * *',
 };
 
 export class SummaryScheduler {
   private static _instance: SummaryScheduler;
   private readonly walletRepo = new DynamoWalletWatchRepository();
   private readonly settingsRepo = new DynamoGuildSettingsRepository();
+  private readonly lpClient = LpAgentService.getInstance();
   private readonly jobs: CronJob[] = [];
 
   private constructor() {}
 
-  /** Singleton */
   public static getInstance(): SummaryScheduler {
     if (!SummaryScheduler._instance) {
       SummaryScheduler._instance = new SummaryScheduler();
@@ -29,70 +32,74 @@ export class SummaryScheduler {
     return SummaryScheduler._instance;
   }
 
-  /**
-   * Démarre tous les jobs cron pour chaque fréquence × chaque timezone connue.
-   * @param client Client Discord
-   * @param overrides Permet d’injecter d’autres expressions cron (tests, dev…)
-   */
-  public start(client: Client, overrides: Partial<Record<SummaryFreq, string>> = {}): void {
+  public start(client: Client, overrides: Partial<Record<Frequency, string>> = {}): void {
     const scheduleMap = { ...DEFAULT_CRON, ...overrides };
-
-    for (const freq of Object.keys(scheduleMap) as SummaryFreq[]) {
-      const cronExpr = scheduleMap[freq];
+    for (const freq of Object.keys(scheduleMap) as Frequency[]) {
+      const expr = scheduleMap[freq];
       for (const tz of TimezoneHelper.all()) {
-        // CronJob(cronTime, onTick, onComplete?, start?, timeZone)
-        const job = new CronJob(
-          cronExpr,
-          () => void this.run(freq, tz, client),
-          null,
-          true,
-          tz,
-        );
+        const job = new CronJob(expr, () => void this.run(freq, tz, client), null, true, tz);
         this.jobs.push(job);
       }
     }
-
-    console.log(`📅 SummaryScheduler démarré pour fréquences ${Object.keys(scheduleMap).join(', ')}`);
   }
 
-  /** Stoppe tous les jobs programmés */
   public stopAll(): void {
     this.jobs.forEach((j) => j.stop());
     this.jobs.length = 0;
-    console.log('🛑 SummaryScheduler stopped.');
   }
 
-  /**
-   * Méthode invoquée à chaque déclenchement cron.
-   * - Charge tous les WalletWatch pour la fréquence donnée (GSI query)
-   * - Pour chaque watch, récupère sa guild timezone (via settingsRepo.find)
-   * - Si la timezone de la guild correspond à celle du job, envoie le résumé
-   */
-  private async run(freq: SummaryFreq, tz: Timezone, client: Client) {
+  public async run(freq: Frequency, tz: Timezone, client: Client) {
+    // TODO mettre en privée
     try {
-      // 1) récupère toutes les paires guild+wallet qui ont summaryX=1
       const watches = await this.walletRepo.listBySummary(freq);
+      if (!watches.length) return;
 
-      if (watches.length === 0) return;
-      // 2) pour chaque watch, on récupère la timezone de la guild
       await Promise.all(
-        watches.map(async (w) => {
-          // find renvoie null si pas de settings => on skip
+        watches.map(async (w: WalletWatch) => {
           const settings = await this.settingsRepo.find(w.guildId);
           if (settings?.timezone !== tz) return;
-          // envoi du résumé dans le channel
-          const ch = await client.channels.fetch(w.channelId).catch(() => null);
-          if (ch instanceof TextChannel) {
-            await ch
-              .send(
-                `📝 **[${freq} Summary]**\n• **Wallet:** \`${w.address}\`\n• **Time zone:** ${tz}\n\n*Ceci est votre récapitulatif automatique.*`,
-              )
-              .catch((err) => console.error('Failed to send summary:', err));
-          }
+          await this.sendSummary(freq, w, tz, client);
         }),
       );
     } catch (err) {
-      console.error(`❌ SummaryScheduler error [${freq}@${tz}]:`, err);
+      logger.error('Error in SummaryScheduler', err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+
+  private async sendSummary(freq: Frequency, watch: WalletWatch, tz: Timezone, client: Client): Promise<void> {
+    const { startUtc, endUtc } = this.lpClient.computeRange(freq, tz);
+
+    const positions = await this.lpClient.fetchRange(watch.address, startUtc, endUtc);
+
+    const totalPct = positions.reduce((sum, p) => sum + p.percent, 0);
+    const totalSol = positions.reduce((sum, p) => sum + p.pnlSol, 0);
+    const totalUsd = positions.reduce((sum, p) => sum + p.pnlUsd, 0);
+    const totalVolSol = positions.reduce((sum, p) => sum + Math.abs(p.pnlSol), 0);
+    const totalVolUsd = positions.reduce((sum, p) => sum + Math.abs(p.pnlUsd), 0);
+
+    const embed = buildSummaryEmbed(freq, watch.address, tz, positions, startUtc, endUtc) // TODO du coup utiliser les valeurs deja calculer.. et faire ça dans une autre fonction plutot
+      .setImage('attachment://summary.png');
+
+    const fmtDate = (d: Date) => d.toLocaleDateString('en-US');
+    const periodLabel = `${fmtDate(startUtc)} – ${fmtDate(endUtc)}`;
+
+    const imgData: SummaryData = {
+      periodLabel,
+      winRatePct: totalPct,
+      totalVolumeSol: totalVolSol,
+      totalVolumeUsd: totalVolUsd,
+      totalPnlSol: totalSol,
+      totalPnlUsd: totalUsd,
+    };
+
+    const imageBuffer = await buildSummaryImage(imgData);
+
+    const ch = await client.channels.fetch(watch.channelId).catch(() => null);
+    if (ch?.isSendable()) {
+      await ch.send({
+        embeds: [embed],
+        files: [{ attachment: imageBuffer, name: 'summary.png' }],
+      });
     }
   }
 }

@@ -2,6 +2,7 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import { z } from 'zod';
 import { _dirname } from '../../shared/files';
+import { logger } from '../../shared/logger';
 
 dotenv.config({ path: path.resolve(_dirname, '../../.env') });
 
@@ -33,7 +34,7 @@ const EnvSchema = z.object({
 
 const _env = EnvSchema.safeParse(process.env);
 if (!_env.success) {
-  console.error('❌ Invalid or missing environment variables:', _env.error.format());
+  logger.fatal('Invalid or missing environment variables', undefined, { errors: _env.error.format() });
   process.exit(1);
 }
 
