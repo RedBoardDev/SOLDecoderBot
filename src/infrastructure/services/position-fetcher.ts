@@ -1,13 +1,13 @@
 import { RateLimiter } from './rate-limiter';
 import { MeteoraPositionService } from './meteora-position';
-import { LpAgentClient } from './lpagent-client';
 import { PositionResponseSchema, type PositionResponse } from '../../schemas/position-response.schema.ts';
+import { LpAgentService } from './lpagent-service.ts';
 
 export class PositionFetcher {
   private static _instance: PositionFetcher;
-  private readonly limiter = RateLimiter.getInstance();
+  private readonly limiter = new RateLimiter(500);
   private readonly meteora = MeteoraPositionService.getInstance();
-  private readonly lpClient = new LpAgentClient();
+  private readonly lpClient = LpAgentService.getInstance();
 
   private constructor() {}
 
@@ -30,14 +30,5 @@ export class PositionFetcher {
       out.push(position);
     }
     return out;
-  }
-
-  async fetchPosition(hash: string): Promise<PositionResponse> {
-    const position = await this.limiter.enqueue(async () => {
-      const mainTx = await this.meteora.getMainPosition(hash);
-      const raw = await this.lpClient.fetchPosition(mainTx);
-      return PositionResponseSchema.parse(raw);
-    });
-    return position;
   }
 }
