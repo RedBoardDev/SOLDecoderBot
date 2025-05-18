@@ -44,7 +44,7 @@ class Logger {
     try {
       if (!fs.existsSync(this.logDir)) {
         fs.mkdirSync(this.logDir, { recursive: true });
-        console.info(`Created log directory: ${this.logDir}`);
+        console.error(`Created log directory: ${this.logDir}`);
       }
     } catch (err) {
       console.error(`Failed to create log directory: ${err instanceof Error ? err.message : String(err)}`);
