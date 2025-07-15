@@ -1,55 +1,97 @@
-import {
-  DynamoDBClient,
-  UpdateItemCommand,
-  type UpdateItemCommandInput,
-  type UpdateItemCommandOutput,
-} from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
-  PutCommand,
-  type PutCommandInput,
-  type PutCommandOutput,
-  GetCommand,
-  type GetCommandInput,
-  type GetCommandOutput,
-  QueryCommand,
-  type QueryCommandInput,
-  type QueryCommandOutput,
-  ScanCommand,
-  type ScanCommandInput,
-  type ScanCommandOutput,
   DeleteCommand,
-  type DeleteCommandInput,
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  ScanCommand,
+  UpdateCommand,
   BatchWriteCommand,
   type BatchWriteCommandInput,
   type BatchWriteCommandOutput,
-  UpdateCommand,
+  type DeleteCommandInput,
+  type DeleteCommandOutput,
+  type GetCommandInput,
+  type GetCommandOutput,
+  type PutCommandInput,
+  type PutCommandOutput,
+  type QueryCommandInput,
+  type QueryCommandOutput,
+  type ScanCommandInput,
+  type ScanCommandOutput,
   type UpdateCommandInput,
   type UpdateCommandOutput,
 } from '@aws-sdk/lib-dynamodb';
-import { config } from '../config/env';
+import { config } from '@config/env.js';
+import { logger } from '@shared/logger.js';
 
-const credentials = {
-  accessKeyId: config.aws.credentials.accessKeyId,
-  secretAccessKey: config.aws.credentials.secretAccessKey,
-};
+// Ensure credentials are available
+if (!config.AWS_KEY || !config.AWS_SECRET) {
+  throw new Error('AWS credentials are required but not configured');
+}
+
 const client = new DynamoDBClient({
-  region: config.aws.region,
-  credentials,
-});
-const docClient = DynamoDBDocumentClient.from(client, {
-  marshallOptions: { removeUndefinedValues: true },
+  region: config.REGION,
+  credentials: {
+    accessKeyId: config.AWS_KEY,
+    secretAccessKey: config.AWS_SECRET,
+  },
 });
 
+const docClient = DynamoDBDocumentClient.from(client, {
+  marshallOptions: {
+    convertEmptyValues: false,
+    removeUndefinedValues: true,
+    convertClassInstanceToMap: false,
+  },
+  unmarshallOptions: {
+    wrapNumbers: false,
+  },
+});
+
+/**
+ * Optimized DynamoDB service with consistent error handling and no redundant methods
+ */
 export default class DynamoService {
-  create = (params: PutCommandInput): Promise<PutCommandOutput> => docClient.send(new PutCommand(params));
-  get = (params: GetCommandInput): Promise<GetCommandOutput> => docClient.send(new GetCommand(params));
-  query = (params: QueryCommandInput): Promise<QueryCommandOutput> => docClient.send(new QueryCommand(params));
-  scan = (params: ScanCommandInput): Promise<ScanCommandOutput> => docClient.send(new ScanCommand(params));
-  delete = (params: DeleteCommandInput): Promise<void> => docClient.send(new DeleteCommand(params)).then(() => {});
-  batchWrite = (params: BatchWriteCommandInput): Promise<BatchWriteCommandOutput> =>
-    docClient.send(new BatchWriteCommand(params));
-  update = (params: UpdateCommandInput): Promise<UpdateCommandOutput> => docClient.send(new UpdateCommand(params));
-  updateItem = (params: UpdateItemCommandInput): Promise<UpdateItemCommandOutput> =>
-    docClient.send(new UpdateItemCommand(params));
+  /**
+   * Generic method to execute DynamoDB commands with consistent error handling
+   */
+  private async executeCommand(command: any, operation: string, errorPrefix = operation): Promise<any> {
+    try {
+      return await docClient.send(command);
+    } catch (error) {
+      logger.dbError(operation, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`${errorPrefix}-error: ${errorMessage}`);
+    }
+  }
+
+  create = async (params: PutCommandInput): Promise<PutCommandOutput> => {
+    return this.executeCommand(new PutCommand(params), 'create');
+  };
+
+  get = async (params: GetCommandInput): Promise<GetCommandOutput> => {
+    return this.executeCommand(new GetCommand(params), 'get');
+  };
+
+  update = async (params: UpdateCommandInput): Promise<UpdateCommandOutput> => {
+    return this.executeCommand(new UpdateCommand(params), 'update');
+  };
+
+  delete = async (params: DeleteCommandInput): Promise<DeleteCommandOutput> => {
+    return this.executeCommand(new DeleteCommand(params), 'delete');
+  };
+
+  query = async (params: QueryCommandInput): Promise<QueryCommandOutput> => {
+    return this.executeCommand(new QueryCommand(params), 'query');
+  };
+
+  scan = async (params: ScanCommandInput): Promise<ScanCommandOutput> => {
+    return this.executeCommand(new ScanCommand(params), 'scan');
+  };
+
+  batchWrite = async (params: BatchWriteCommandInput): Promise<BatchWriteCommandOutput> => {
+    return this.executeCommand(new BatchWriteCommand(params), 'batch-write');
+  };
 }

@@ -28,3 +28,6 @@ Thumbs.db
 
 # Coverage directories
 coverage/
+
+# Discord bot cache
+.deployed-commands.json

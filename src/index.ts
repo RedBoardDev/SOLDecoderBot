@@ -1,109 +1,168 @@
-// src/index.ts
-import { Client, GatewayIntentBits, MessageFlags } from 'discord.js';
-import { REST } from '@discordjs/rest';
-import { Routes } from 'discord-api-types/v10';
+import { Client, GatewayIntentBits, Events } from 'discord.js';
+import { config } from './infrastructure/config/env.js';
+import { logger } from './shared/logger.js';
+import { loadCommands } from './presentation/utils/command-loader.js';
+import { loadEvents } from './presentation/utils/event-loader.js';
+import { RpcServiceManager } from './infrastructure/services/rpc-service-manager.js';
+import {
+  createAutoRefreshScheduler,
+  type AutoRefreshScheduler,
+} from './infrastructure/services/auto-refresh-scheduler.js';
+import { DiscordClientManager } from './infrastructure/services/discord-client-manager.js';
 
-import { config } from './infrastructure/config/env';
-import { logger } from './shared/logger';
-import { setupErrorHandler } from './shared/error-handler';
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception occurred', error);
+  logger.warn('Bot continues running, but this error should be investigated');
+});
 
-import { watchersCommand } from './presentation/commands/watchers.command';
-import { registerWatchersInteractionHandlers } from './presentation/listeners/watchers-interaction';
-import { registerWalletDetailInteractionHandlers } from './presentation/listeners/watchers-interaction/wallet-settings';
-import { registerClosedMessageListener } from './presentation/listeners/closed-message.listener';
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection occurred', { reason, promise });
+  logger.warn('Bot continues running, but this error should be investigated');
+});
 
-import { SummaryScheduler } from './infrastructure/services/summary-scheduler';
+class SolDecoderBot {
+  private client: Client;
+  private commands: Map<string, any> | undefined;
+  private rpcServiceManager: RpcServiceManager;
+  private discordClientManager: DiscordClientManager;
+  private autoRefreshScheduler: AutoRefreshScheduler | undefined;
 
-const DISCORD_INTENTS = [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent];
-
-async function registerSlashCommands(clientId: string, token: string) {
-  const rest = new REST({ version: '10' }).setToken(token);
-  const payload = [watchersCommand.data.toJSON()];
-
-  try {
-    await rest.put(Routes.applicationCommands(clientId), { body: payload });
-    logger.info('✅ Registered slash commands');
-  } catch (err: unknown) {
-    logger.error('Failed to register slash commands', err instanceof Error ? err : new Error(String(err)));
-    throw err;
+  constructor() {
+    this.client = new Client({
+      intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildMembers, // Required for role management
+      ],
+    });
+    this.rpcServiceManager = RpcServiceManager.getInstance();
+    this.discordClientManager = DiscordClientManager.getInstance();
+    this.setupEventHandlers();
   }
-}
 
-function wireInteractionHandler(client: Client) {
-  client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
+  private setupEventHandlers(): void {
+    this.client.once(Events.ClientReady, async (client) => {
+      logger.info(`Discord bot ready - logged in as ${client.user?.tag}`);
 
-    switch (interaction.commandName) {
-      case watchersCommand.data.name:
-        await watchersCommand.execute(interaction);
-        break;
-      default:
-        await interaction.reply({
-          content: 'Unknown command',
-          flags: MessageFlags.Ephemeral,
-        });
-    }
-  });
-}
+      try {
+        // Initialize Discord Client Manager
+        this.discordClientManager.initialize(client);
 
-function wireAdditionalListeners(client: Client) {
-  registerClosedMessageListener(client);
-  registerWatchersInteractionHandlers(client);
-  registerWalletDetailInteractionHandlers(client);
-}
+        // Initialize RPC service
+        this.rpcServiceManager.initialize(config.RPC_ENDPOINT);
+        logger.serviceInit('RPC Service Manager');
 
-function setupShutdownHooks(client: Client) {
-  const shutdown = async () => {
-    logger.info('Graceful shutdown initiated');
+        // Load commands and events
+        this.commands = await loadCommands(client);
+        await loadEvents(client);
+
+        // Initialize auto-refresh scheduler (now async)
+        this.autoRefreshScheduler = await createAutoRefreshScheduler();
+        this.autoRefreshScheduler.start();
+        logger.serviceInit('Auto-refresh scheduler (15-minute interval)');
+
+        logger.info('Bot initialization completed successfully');
+        logger.info('Use npm run deploy-commands to register slash commands');
+      } catch (error) {
+        logger.error('Bot initialization failed', error);
+        logger.warn('Bot will continue with limited functionality');
+      }
+    });
+
+    this.client.on(Events.InteractionCreate, async (interaction) => {
+      if (!interaction.isChatInputCommand()) return;
+
+      const command = this.commands?.get(interaction.commandName);
+      if (!command) {
+        logger.warn(`Unknown command attempted: ${interaction.commandName}`);
+        return;
+      }
+
+      try {
+        logger.commandExecution(interaction.commandName, interaction.user.id);
+        await command.execute(interaction);
+      } catch (error) {
+        logger.commandError(interaction.commandName, interaction.user.id, error);
+
+        const reply = {
+          content: 'There was an error while executing this command. Please try again later.',
+          ephemeral: true,
+        };
+
+        try {
+          if (interaction.replied || interaction.deferred) {
+            await interaction.followUp(reply);
+          } else {
+            await interaction.reply(reply);
+          }
+        } catch (replyError) {
+          logger.error('Failed to send error reply to user', replyError);
+        }
+      }
+    });
+
+    // Discord client error handling
+    this.client.on(Events.Error, (error) => {
+      logger.error('Discord client error occurred', error);
+    });
+  }
+
+  async shutdown(): Promise<void> {
+    logger.info('Bot shutdown initiated');
+
     try {
-      SummaryScheduler.getInstance().stopAll();
-      await client.destroy();
-      logger.info('Discord client destroyed');
-    } catch (err: unknown) {
-      logger.error('Error during shutdown', err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      process.exit(0);
+      if (this.autoRefreshScheduler) {
+        this.autoRefreshScheduler.stop();
+      }
+      await this.rpcServiceManager.shutdown();
+      this.client.destroy();
+      logger.info('Bot shutdown completed successfully');
+    } catch (error) {
+      logger.error('Error during bot shutdown', error);
     }
-  };
+  }
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
-}
+  async start(): Promise<void> {
+    try {
+      await this.client.login(config.DISCORD_TOKEN);
+      logger.info('Bot login successful');
+    } catch (error) {
+      logger.error('Bot login failed', error);
+      logger.warn('Check Discord token and internet connection');
 
-async function main() {
-  logger.info('Initializing bot');
-  setupErrorHandler();
-
-  const client = new Client({ intents: DISCORD_INTENTS });
-
-  client.once('ready', async () => {
-    logger.info(`Logged in as ${client.user?.tag}`);
-
-    // register application (slash) commands
-    await registerSlashCommands(client.user!.id, config.discordToken);
-
-    // start the periodic summary
-    SummaryScheduler.getInstance().start(client);
-  });
-
-  wireInteractionHandler(client);
-  wireAdditionalListeners(client);
-
-  client.on('error', (error) => {
-    logger.error('Discord client error', error);
-  });
-
-  setupShutdownHooks(client);
-
-  try {
-    await client.login(config.discordToken);
-  } catch (err: unknown) {
-    logger.fatal('Failed to login to Discord', err instanceof Error ? err : new Error(String(err)));
-    process.exit(1);
+      // Wait before retry
+      setTimeout(() => {
+        logger.info('Attempting reconnection...');
+        this.start().catch((retryError) => {
+          logger.error('Reconnection failed', retryError);
+          logger.error('Bot will exit - please check configuration');
+          process.exit(1);
+        });
+      }, 5000);
+    }
   }
 }
 
-main().catch((err: unknown) => {
-  logger.fatal('Bot startup failed', err instanceof Error ? err : new Error(String(err)));
+// Graceful shutdown handling
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received - initiating graceful shutdown');
+  const bot = new SolDecoderBot();
+  await bot.shutdown();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received - initiating graceful shutdown');
+  const bot = new SolDecoderBot();
+  await bot.shutdown();
+  process.exit(0);
+});
+
+// Start the bot
+const bot = new SolDecoderBot();
+bot.start().catch((error) => {
+  logger.error('Failed to start bot', error);
+  logger.error('Check configuration and restart bot');
   process.exit(1);
 });

@@ -1,144 +1,239 @@
-import chalk from 'chalk';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import chalk from 'chalk';
 
-enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3,
-  FATAL = 4,
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export enum LogLevel {
+  ERROR = 0,
+  WARN = 1,
+  INFO = 2,
+  DEBUG = 3,
 }
 
-type LoggerOptions = {
-  level?: LogLevel;
-  timestamps?: boolean;
-  colorize?: boolean;
-  logToFile?: boolean;
-  logDir?: string;
-};
+interface LogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  data?: any;
+}
 
 class Logger {
-  private level: LogLevel;
-  private timestamps: boolean;
-  private colorize: boolean;
-  private logToFile: boolean;
-  private logDir: string;
-  private currentLogFile: string | null = null;
-  private currentDate = '';
+  private static instance: Logger;
+  private currentLevel: LogLevel;
+  private logsDir: string;
+  private readonly MAX_LOG_SIZE = 10 * 1024 * 1024; // 10MB
 
-  constructor(options: LoggerOptions = {}) {
-    this.level = options.level ?? LogLevel.INFO;
-    this.timestamps = options.timestamps ?? true;
-    this.colorize = options.colorize ?? true;
-    this.logToFile = options.logToFile ?? true;
-    this.logDir = options.logDir ?? path.join(process.cwd(), 'logs');
+  private constructor() {
+    // Initialize logs directory
+    this.logsDir = path.join(path.dirname(__dirname), '..', 'logs');
+    this.ensureLogsDirectory();
 
-    if (this.logToFile) {
-      this.initializeLogDir();
-      this.updateLogFile();
+    // Set log level from environment
+    const envLevel = process.env.LOG_LEVEL?.toLowerCase() || 'info';
+    this.currentLevel = this.mapLogLevel(envLevel);
+  }
+
+  static getInstance(): Logger {
+    if (!Logger.instance) {
+      Logger.instance = new Logger();
+    }
+    return Logger.instance;
+  }
+
+  private ensureLogsDirectory(): void {
+    if (!fs.existsSync(this.logsDir)) {
+      fs.mkdirSync(this.logsDir, { recursive: true });
     }
   }
 
-  private initializeLogDir(): void {
-    try {
-      if (!fs.existsSync(this.logDir)) {
-        fs.mkdirSync(this.logDir, { recursive: true });
-        console.error(`Created log directory: ${this.logDir}`);
+  private mapLogLevel(level: string): LogLevel {
+    switch (level) {
+      case 'error':
+        return LogLevel.ERROR;
+      case 'warn':
+        return LogLevel.WARN;
+      case 'info':
+        return LogLevel.INFO;
+      case 'debug':
+        return LogLevel.DEBUG;
+      default:
+        return LogLevel.INFO;
+    }
+  }
+
+  private getLogFileName(): string {
+    const date = new Date().toISOString().split('T')[0];
+    return `${date}.log`;
+  }
+
+  private getColoredLevel(level: LogLevel): string {
+    switch (level) {
+      case LogLevel.ERROR:
+        return chalk.bold.red('ERROR');
+      case LogLevel.WARN:
+        return chalk.bold.yellow('WARN ');
+      case LogLevel.INFO:
+        return chalk.bold.blue('INFO ');
+      case LogLevel.DEBUG:
+        return chalk.bold.gray('DEBUG');
+      default:
+        return chalk.bold.white('UNKNOWN');
+    }
+  }
+
+  private getColoredTimestamp(): string {
+    return chalk.gray(new Date().toISOString());
+  }
+
+  private formatLogEntry(level: LogLevel, message: string, data?: any): string {
+    const timestamp = new Date().toISOString();
+    const levelName = LogLevel[level];
+
+    let logLine = `${timestamp} [${levelName}] ${message}`;
+
+    if (data !== undefined) {
+      if (data instanceof Error) {
+        logLine += `\n  Error: ${data.message}`;
+        if (data.stack) {
+          logLine += `\n  Stack: ${data.stack}`;
+        }
+      } else if (typeof data === 'object') {
+        try {
+          logLine += `\n  Data: ${JSON.stringify(data, null, 2)}`;
+        } catch {
+          logLine += '\n  Data: [Object - could not serialize]';
+        }
+      } else {
+        logLine += `\n  Data: ${String(data)}`;
       }
-    } catch (err) {
-      console.error(`Failed to create log directory: ${err instanceof Error ? err.message : String(err)}`);
-      this.logToFile = false;
+    }
+
+    return logLine;
+  }
+
+  private formatConsoleLog(level: LogLevel, message: string, data?: any): string {
+    const timestamp = this.getColoredTimestamp();
+    const coloredLevel = this.getColoredLevel(level);
+    const coloredMessage = this.getColoredMessage(level, message);
+
+    let logLine = `${timestamp} ${coloredLevel} ${coloredMessage}`;
+
+    if (data !== undefined) {
+      if (data instanceof Error) {
+        logLine += `\n  ${chalk.red('Error:')} ${chalk.red(data.message)}`;
+        if (data.stack) {
+          logLine += `\n  ${chalk.gray('Stack:')} ${chalk.gray(data.stack)}`;
+        }
+      } else if (typeof data === 'object') {
+        try {
+          const jsonData = JSON.stringify(data, null, 2);
+          logLine += `\n  ${chalk.cyan('Data:')} ${chalk.gray(jsonData)}`;
+        } catch {
+          logLine += `\n  ${chalk.cyan('Data:')} ${chalk.gray('[Object - could not serialize]')}`;
+        }
+      } else {
+        logLine += `\n  ${chalk.cyan('Data:')} ${chalk.gray(String(data))}`;
+      }
+    }
+
+    return logLine;
+  }
+
+  private getColoredMessage(level: LogLevel, message: string): string {
+    switch (level) {
+      case LogLevel.ERROR:
+        return chalk.red(message);
+      case LogLevel.WARN:
+        return chalk.yellow(message);
+      case LogLevel.INFO:
+        return chalk.white(message);
+      case LogLevel.DEBUG:
+        return chalk.gray(message);
+      default:
+        return chalk.white(message);
     }
   }
 
-  private updateLogFile(): void {
-    const isoDate = new Date().toISOString().split('T')[0];
-    if (this.currentDate !== isoDate) {
-      this.currentDate = isoDate;
-      this.currentLogFile = path.join(this.logDir, `${isoDate}.log`);
-    }
-  }
+  private writeToFile(level: LogLevel, message: string, data?: any): void {
+    const logEntry = this.formatLogEntry(level, message, data);
+    const fileName = this.getLogFileName();
+    const filePath = path.join(this.logsDir, fileName);
 
-  private formatTimestamp(): string {
-    return this.timestamps ? `[${new Date().toISOString()}]` : '';
-  }
-
-  private formatMessage(levelLabel: string, message: string, metadata?: Record<string, unknown>): string {
-    const ts = this.formatTimestamp();
-    const meta = metadata ? ` ${JSON.stringify(metadata)}` : '';
-    return `${ts} ${levelLabel} ${message}${meta}`;
-  }
-
-  private writeToFile(msg: string): void {
-    if (!this.logToFile || !this.currentLogFile) return;
-    this.updateLogFile();
     try {
-      fs.appendFileSync(this.currentLogFile, `${msg}\n`);
-    } catch (err) {
-      console.error(`Failed to write to log file: ${err instanceof Error ? err.message : String(err)}`);
+      // Check file size and rotate if necessary
+      if (fs.existsSync(filePath)) {
+        const stats = fs.statSync(filePath);
+        if (stats.size > this.MAX_LOG_SIZE) {
+          const rotatedFileName = `${fileName}.${Date.now()}`;
+          fs.renameSync(filePath, path.join(this.logsDir, rotatedFileName));
+        }
+      }
+
+      fs.appendFileSync(filePath, `${logEntry}\n`, 'utf8');
+    } catch (error) {
+      // Fallback to console if file writing fails
+      console.error('Failed to write to log file:', error);
+      console.log(logEntry);
     }
   }
 
-  debug(message: string, metadata?: Record<string, unknown>): void {
-    if (this.level <= LogLevel.DEBUG) {
-      const formatted = this.formatMessage('DEBUG', message, metadata);
-      console.debug(this.colorize ? chalk.gray(formatted) : formatted);
+  private log(level: LogLevel, message: string, data?: any): void {
+    if (level <= this.currentLevel) {
+      // Write to file (without colors for file logs)
+      this.writeToFile(level, message, data);
+
+      // Output to console with colors in development
+      if (process.env.NODE_ENV !== 'production') {
+        const consoleLog = this.formatConsoleLog(level, message, data);
+        console.log(consoleLog);
+      }
     }
   }
 
-  info(message: string, metadata?: Record<string, unknown>): void {
-    if (this.level <= LogLevel.INFO) {
-      const formatted = this.formatMessage('INFO', message, metadata);
-      console.info(this.colorize ? chalk.blue(formatted) : formatted);
-      this.writeToFile(formatted);
-    }
+  error(message: string, data?: any): void {
+    this.log(LogLevel.ERROR, message, data);
   }
 
-  warn(message: string, metadata?: Record<string, unknown>): void {
-    if (this.level <= LogLevel.WARN) {
-      const formatted = this.formatMessage('WARN', message, metadata);
-      console.warn(this.colorize ? chalk.yellow(formatted) : formatted);
-      this.writeToFile(formatted);
-    }
+  warn(message: string, data?: any): void {
+    this.log(LogLevel.WARN, message, data);
   }
 
-  error(message: string, error?: Error, metadata?: Record<string, unknown>): void {
-    if (this.level <= LogLevel.ERROR) {
-      const combined = error ? { ...metadata, error: { message: error.message, stack: error.stack } } : metadata;
-      const formatted = this.formatMessage('ERROR', message, combined);
-      console.error(this.colorize ? chalk.red(formatted) : formatted);
-      this.writeToFile(formatted);
-    }
+  info(message: string, data?: any): void {
+    this.log(LogLevel.INFO, message, data);
   }
 
-  fatal(message: string, error?: Error, metadata?: Record<string, unknown>): void {
-    if (this.level <= LogLevel.FATAL) {
-      const combined = error ? { ...metadata, error: { message: error.message, stack: error.stack } } : metadata;
-      const formatted = this.formatMessage('FATAL', message, combined);
-      console.error(this.colorize ? chalk.bgRed.white(formatted) : formatted);
-      this.writeToFile(formatted);
-    }
+  debug(message: string, data?: any): void {
+    this.log(LogLevel.DEBUG, message, data);
   }
 
-  setLevel(level: LogLevel): void {
-    this.level = level;
+  // Utility methods for common patterns with enhanced styling
+  dbError(operation: string, error: any): void {
+    this.error(`Database operation failed: ${chalk.bold(operation)}`, error);
   }
 
-  enableFileLogging(enable = true): void {
-    this.logToFile = enable;
-    if (enable && !this.currentLogFile) {
-      this.initializeLogDir();
-      this.updateLogFile();
-    }
+  apiError(endpoint: string, error: any): void {
+    this.error(`API request failed: ${chalk.bold(endpoint)}`, error);
   }
 
-  setLogDirectory(directory: string): void {
-    this.logDir = directory;
-    this.initializeLogDir();
-    this.updateLogFile();
+  serviceInit(serviceName: string): void {
+    this.info(`Service initialized: ${chalk.green.bold(serviceName)}`);
+  }
+
+  serviceError(serviceName: string, error: any): void {
+    this.error(`Service error: ${chalk.bold(serviceName)}`, error);
+  }
+
+  commandExecution(commandName: string, userId: string): void {
+    this.info(`Command executed: ${chalk.cyan.bold(commandName)} by user ${chalk.magenta(userId)}`);
+  }
+
+  commandError(commandName: string, userId: string, error: any): void {
+    this.error(`Command failed: ${chalk.cyan.bold(commandName)} by user ${chalk.magenta(userId)}`, error);
   }
 }
 
-export const logger = new Logger();
-export { LogLevel };
+// Export singleton instance
+export const logger = Logger.getInstance();

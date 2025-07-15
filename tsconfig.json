@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "lib": ["ES2022"],
-    "rootDir": "archives2/src",
+    "rootDir": "src",
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
@@ -15,8 +15,21 @@
     "isolatedModules": true,
     "noEmit": true,
     "experimentalDecorators": false,
-    "emitDecoratorMetadata": false
+    "emitDecoratorMetadata": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@shared/*": ["src/shared/*"],
+      "@domain/*": ["src/domain/*"],
+      "@application/*": ["src/application/*"],
+      "@infrastructure/*": ["src/infrastructure/*"],
+      "@presentation/*": ["src/presentation/*"],
+      "@schemas/*": ["src/schemas/*"],
+      "@config/*": ["src/infrastructure/config/*"],
+      "@services/*": ["src/infrastructure/services/*"],
+      "@repositories/*": ["src/infrastructure/repositories/*"]
+    }
   },
-  "include": ["archives2/src"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "old_code"]
 }

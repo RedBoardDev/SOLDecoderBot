@@ -1,31 +1,30 @@
 export class ApplicationError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = this.constructor.name;
+    this.name = 'ApplicationError';
   }
 }
 
-/**
- * Error caused by invalid input or expected business state.
- */
-export class UserError extends ApplicationError {}
+export class MonitoringError extends ApplicationError {
+  constructor(
+    message: string,
+    public readonly originalError?: Error,
+  ) {
+    super(`Monitoring error: ${message}`);
+    this.name = 'MonitoringError';
+  }
+}
 
-/**
- * Error for invalid input (e.g., Zod validation).
- */
-export class ValidationError extends UserError {}
+export class PriceServiceError extends ApplicationError {
+  constructor(message: string) {
+    super(`Price service error: ${message}`);
+    this.name = 'PriceServiceError';
+  }
+}
 
-/**
- * Error when an entity already exists.
- */
-export class AlreadyExistsError extends UserError {}
-
-/**
- * Error when an entity is not found.
- */
-export class NotFoundError extends UserError {}
-
-/**
- * Internal or unexpected error. Do not expose details to the user.
- */
-export class InternalError extends ApplicationError {}
+export class NotificationError extends ApplicationError {
+  constructor(message: string) {
+    super(`Notification error: ${message}`);
+    this.name = 'NotificationError';
+  }
+}
