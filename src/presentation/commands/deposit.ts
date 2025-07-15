@@ -49,5 +49,5 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     })
     .setTimestamp();
 
-  await interaction.reply({ embeds: [embed] });
+  await interaction.reply({ embeds: [embed], ephemeral: true });
 }
