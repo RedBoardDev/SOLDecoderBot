@@ -14,14 +14,12 @@
     "lint:fix": "biome lint --write .",
     "check:all": "biome check . --diagnostic-level=error",
     "typescript:check": "tsc --noEmit",
-    "pm2:start": "pm2 start ecosystem.config.mjs --env production",
-    "pm2:stop": "pm2 stop solanashares-bot",
-    "pm2:restart": "pm2 restart solanashares-bot",
-    "pm2:reload": "pm2 reload ecosystem.config.mjs --env production",
-    "pm2:delete": "pm2 delete solanashares-bot",
-    "pm2:logs": "pm2 logs solanashares-bot",
-    "pm2:monit": "pm2 monit",
-    "pm2:status": "pm2 status"
+    "pm2:start": "npx pm2 start ecosystem.config.cjs --env production",
+    "pm2:stop": "npx pm2 stop solanashares-bot",
+    "pm2:restart": "npx pm2 restart solanashares-bot",
+    "pm2:reload": "npx pm2 reload ecosystem.config.cjs --env production",
+    "pm2:delete": "npx pm2 delete solanashares-bot",
+    "pm2:logs": "npx pm2 logs solanashares-bot"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.738.0",
