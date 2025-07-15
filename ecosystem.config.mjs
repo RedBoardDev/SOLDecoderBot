@@ -1,22 +1,43 @@
-// ecosystem.config.mjs
 export default {
   apps: [
     {
       name: 'solanashares-logistic',
-      script: 'src/index.ts',
-      interpreter: 'npx',
-      interpreter_args: 'tsx',
+      script: './node_modules/.bin/tsx',
+      args: 'src/index.ts',
       cwd: '.',
-      env: {
-        NODE_ENV: 'development',
-      },
       env_production: {
         NODE_ENV: 'production',
+        LOG_LEVEL: 'warn',
       },
       error_file: './logs/err.log',
       out_file: './logs/out.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      log_file: './logs/combined.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      time: true,
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      ignore_watch: [
+        'node_modules',
+        'logs',
+        '.git',
+        '*.log',
+        'ecosystem.config.mjs',
+        'package.json',
+        'package-lock.json',
+      ],
+      max_memory_restart: '512M',
+      min_uptime: '10s',
+      max_restarts: 10,
+      restart_delay: 4000,
+      kill_timeout: 5000,
+      wait_ready: true,
+      listen_timeout: 8000,
+      env_file: '.env',
+      autorestart: true,
+      node_args: '--max-old-space-size=512',
+      pmx: true,
+      merge_logs: true,
     },
   ],
 };
-
