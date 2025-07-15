@@ -9,6 +9,7 @@ import {
   type AutoRefreshScheduler,
 } from './infrastructure/services/auto-refresh-scheduler.js';
 import { DiscordClientManager } from './infrastructure/services/discord-client-manager.js';
+import { UptimeKumaService } from './infrastructure/services/uptime-kuma-service.js';
 
 // Global error handlers to prevent crashes
 process.on('uncaughtException', (error) => {
@@ -27,6 +28,7 @@ class SolDecoderBot {
   private rpcServiceManager: RpcServiceManager;
   private discordClientManager: DiscordClientManager;
   private autoRefreshScheduler: AutoRefreshScheduler | undefined;
+  private uptimeKumaService: UptimeKumaService;
 
   constructor() {
     this.client = new Client({
@@ -38,6 +40,7 @@ class SolDecoderBot {
     });
     this.rpcServiceManager = RpcServiceManager.getInstance();
     this.discordClientManager = DiscordClientManager.getInstance();
+    this.uptimeKumaService = UptimeKumaService.getInstance();
     this.setupEventHandlers();
   }
 
@@ -61,6 +64,9 @@ class SolDecoderBot {
         this.autoRefreshScheduler = await createAutoRefreshScheduler();
         this.autoRefreshScheduler.start();
         logger.serviceInit('Auto-refresh scheduler (15-minute interval)');
+
+        // Initialize Uptime Kuma monitoring
+        await this.uptimeKumaService.start();
 
         logger.info('Bot initialization completed successfully');
         logger.info('Use npm run deploy-commands to register slash commands');
@@ -115,6 +121,7 @@ class SolDecoderBot {
       if (this.autoRefreshScheduler) {
         this.autoRefreshScheduler.stop();
       }
+      this.uptimeKumaService.stop();
       await this.rpcServiceManager.shutdown();
       this.client.destroy();
       logger.info('Bot shutdown completed successfully');

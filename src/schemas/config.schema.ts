@@ -33,6 +33,13 @@ export const ConfigSchema = z.object({
     .number()
     .min(0, 'Auto refresh startup delay must be non-negative')
     .default(30 * 1000), // 30 seconds
+
+  // Uptime Kuma Push Monitor (optional)
+  UPTIME_KUMA_PUSH_URL: z.string().url('Invalid Uptime Kuma push URL').optional(),
+  UPTIME_KUMA_PING_INTERVAL: z.coerce
+    .number()
+    .min(10000, 'Uptime Kuma ping interval must be at least 10 seconds')
+    .default(60 * 1000), // 1 minute
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
