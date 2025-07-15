@@ -8,39 +8,28 @@ import { logger } from '@shared/logger.js';
 
 export const data = new SlashCommandBuilder()
   .setName('wallet')
-  .setDescription('Manage your Solana wallet tracking and view your investment data')
-  .addSubcommand((subcommand) =>
-    subcommand
+  .setDescription('View your Solana investment data or link your wallet')
+  .addStringOption((option) =>
+    option
       .setName('link')
-      .setDescription('Link your Solana wallet address to your Discord account')
-      .addStringOption((option) =>
-        option.setName('wallet').setDescription('Your Solana wallet address').setRequired(true),
-      ),
-  )
-  .addSubcommand((subcommand) =>
-    subcommand.setName('summary').setDescription('View your detailed investment summary and statistics'),
+      .setDescription('Link a new Solana wallet address to your Discord account')
+      .setRequired(false),
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   const discordUserId = interaction.user.id;
-  const subcommand = interaction.options.getSubcommand(false);
+  const walletToLink = interaction.options.getString('link');
 
   try {
     // Initialize services
     const userInvestmentRepo = new DynamoUserInvestmentRepository();
 
-    // Handle subcommands
-    switch (subcommand) {
-      case 'link':
-        await handleLinkWallet(interaction, discordUserId, userInvestmentRepo);
-        break;
-      case 'summary':
-        await handleWalletSummary(interaction, discordUserId, userInvestmentRepo);
-        break;
-      default:
-        // Default behavior - show quick overview if wallet is linked, otherwise prompt to link
-        await handleDefaultCommand(interaction, discordUserId, userInvestmentRepo);
-        break;
+    if (walletToLink) {
+      // Handle wallet linking
+      await handleLinkWallet(interaction, discordUserId, userInvestmentRepo, walletToLink);
+    } else {
+      // Default behavior - show detailed summary
+      await handleWalletSummary(interaction, discordUserId, userInvestmentRepo);
     }
   } catch (error) {
     logger.error(`Error executing wallet command for user ${discordUserId}:`, error);
@@ -62,12 +51,11 @@ async function handleLinkWallet(
   interaction: ChatInputCommandInteraction,
   discordUserId: string,
   userInvestmentRepo: DynamoUserInvestmentRepository,
+  walletAddressInput: string,
 ) {
   await interaction.deferReply({ ephemeral: true });
 
   try {
-    const walletAddressInput = interaction.options.getString('wallet', true);
-
     // Validate wallet address
     let walletAddress: WalletAddress;
     try {
@@ -112,7 +100,7 @@ async function handleLinkWallet(
     logger.info(`Wallet linked successfully for user ${discordUserId}: ${walletAddress.toString()}`);
 
     await interaction.editReply({
-      content: `✅ **Wallet linked successfully!**\n\n🔗 **Wallet:** \`${walletAddress.toString()}\`\n📊 Your investment data will be updated during the next sync cycle.\n\n💡 Use \`/wallet summary\` to view detailed information once sync is complete.`,
+      content: `✅ **Wallet linked successfully!**\n\n🔗 **Wallet:** \`${walletAddress.toString()}\`\n📊 Your investment data will be updated during the next sync cycle.\n\n💡 Use \`/wallet\` to view detailed information once sync is complete.`,
     });
   } catch (error) {
     logger.error(`Failed to link wallet for user ${discordUserId}:`, error);
@@ -123,7 +111,7 @@ async function handleLinkWallet(
 }
 
 /**
- * Handle the /wallet summary command
+ * Handle the /wallet command
  */
 async function handleWalletSummary(
   interaction: ChatInputCommandInteraction,
@@ -162,7 +150,7 @@ async function handleWalletSummary(
         month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
       })}`,
       '',
       `📈 **SOL Price:** $${solPrice.toFixed(2)}`,
@@ -177,58 +165,6 @@ async function handleWalletSummary(
     logger.error(`Failed to get investment summary for user ${discordUserId}:`, error);
     await interaction.editReply({
       content: '❌ Failed to retrieve investment data. Please try again later.',
-    });
-  }
-}
-
-/**
- * Handle the default /wallet command (no subcommand)
- */
-async function handleDefaultCommand(
-  interaction: ChatInputCommandInteraction,
-  discordUserId: string,
-  userInvestmentRepo: DynamoUserInvestmentRepository,
-) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
-    // Find user investment
-    const userInvestment = await userInvestmentRepo.findByDiscordUserId(discordUserId);
-
-    if (!userInvestment) {
-      await interaction.editReply({
-        content:
-          '❌ **No wallet linked**\n\nPlease link your wallet first using `/wallet link <your_wallet_address>`\n\n💡 Once linked, your investment data will be automatically tracked.',
-      });
-      return;
-    }
-
-    // Show quick summary for default command
-    const quickSummaryLines = [
-      '💼 **Quick Overview**',
-      '',
-      `🔗 **Wallet:** \`${userInvestment.walletAddress}\``,
-      `💰 **Invested:** ${userInvestment.investedAmount.toFixed(6)} SOL`,
-      `🔄 **Last Updated:** ${new Date(userInvestment.updatedAt).toLocaleString('fr-FR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })}`,
-      '',
-      '💡 Use `/wallet summary` for detailed information including USD values.',
-    ];
-
-    await interaction.editReply({
-      content: quickSummaryLines.join('\n'),
-    });
-
-    logger.info(`Quick wallet overview provided for user ${discordUserId}`);
-  } catch (error) {
-    logger.error(`Failed to get quick wallet overview for user ${discordUserId}:`, error);
-    await interaction.editReply({
-      content: '❌ Failed to retrieve wallet data. Please try again later.',
     });
   }
 }

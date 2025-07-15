@@ -45,7 +45,8 @@ async function deployCommands() {
     const force = args.includes('--force') || args.includes('-f') || args.includes('force');
 
     if (force) {
-      logger.info('🔄 Force deployment requested, ignoring cache...');
+      logger.info('🔄 Force deployment requested, clearing existing commands...');
+
       // Delete the hash file to force deployment
       try {
         await fs.unlink(commandsHashFile);
@@ -53,6 +54,18 @@ async function deployCommands() {
       } catch {
         // File doesn't exist, that's fine
         logger.debug('Cache file already deleted or doesn\'t exist');
+      }
+
+      // Clear all existing guild commands first when forcing
+      try {
+        logger.info('🧹 Clearing all existing commands...');
+        await rest.put(
+          Routes.applicationGuildCommands(config.DISCORD_CLIENT_ID, config.GUILD_ID),
+          { body: [] }
+        );
+        logger.info('✅ All existing commands cleared');
+      } catch (error) {
+        logger.warn('⚠️ Failed to clear existing commands:', error);
       }
     }
 
@@ -65,14 +78,16 @@ async function deployCommands() {
       return;
     }
 
-    logger.info(`🔄 Deploying ${commands.length} optimized command(s) to guild ${config.GUILD_ID}...`);
+    logger.info(`🔄 Deploying ${commands.length} command(s) to guild ${config.GUILD_ID}...`);
 
-    // First, get existing commands to clean up old ones
+    // Get existing commands for comparison
     const existingCommands = await rest.get(
       Routes.applicationGuildCommands(config.DISCORD_CLIENT_ID, config.GUILD_ID)
     ) as any[];
 
-    // Deploy new commands
+    logger.info(`📋 Found ${existingCommands.length} existing command(s)`);
+
+    // Deploy new commands (this will replace all existing commands)
     await rest.put(
       Routes.applicationGuildCommands(config.DISCORD_CLIENT_ID, config.GUILD_ID),
       { body: commands }
@@ -81,12 +96,17 @@ async function deployCommands() {
     // Save the hash of deployed commands
     await saveCommandsHash(currentHash);
 
-    logger.info(`✅ Successfully deployed ${commands.length} command(s) to guild ${config.GUILD_ID}.`);
-    logger.info('🚀 Command: /participants - Ultra-fast participant analysis with real-time data');
+    logger.info(`✅ Successfully deployed ${commands.length} command(s):`);
+    commands.forEach((cmd) => {
+      logger.info(`   • /${cmd.name} - ${cmd.description}`);
+    });
 
     if (existingCommands.length > commands.length) {
-      logger.info(`🧹 Cleaned up ${existingCommands.length - commands.length} old command(s).`);
+      logger.info(`🧹 Cleaned up ${existingCommands.length - commands.length} old command(s)`);
+    } else if (existingCommands.length < commands.length) {
+      logger.info(`➕ Added ${commands.length - existingCommands.length} new command(s)`);
     }
+
   } catch (error) {
     logger.error('❌ Failed to deploy commands:', error);
     process.exit(1);
