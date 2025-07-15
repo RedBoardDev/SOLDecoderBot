@@ -3,6 +3,7 @@ import { config } from '../src/infrastructure/config/env.js';
 import { logger } from '../src/shared/logger.js';
 import { data as participantsCommand } from '../src/presentation/commands/participants.js';
 import { data as walletCommand } from '../src/presentation/commands/wallet.js';
+import { data as depositCommand } from '../src/presentation/commands/deposit.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,7 @@ const __dirname = path.dirname(__filename);
 const commands = [
   participantsCommand.toJSON(),
   walletCommand.toJSON(),
+  depositCommand.toJSON(),
 ];
 
 const rest = new REST().setToken(config.DISCORD_TOKEN);
