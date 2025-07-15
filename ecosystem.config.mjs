@@ -2,7 +2,7 @@
 export default {
   apps: [
     {
-      name: 'soldecoder-bot',
+      name: 'solanashares-logistic',
       script: 'src/index.ts',
       interpreter: 'npx',
       interpreter_args: 'tsx',
